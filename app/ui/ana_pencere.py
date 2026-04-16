@@ -1065,56 +1065,11 @@ class AnaPencere(QMainWindow):
     def _tab_raporlar(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20); ana.setSpacing(14)
 
-        # Filtre bar
-        filtre = QFrame(); filtre.setObjectName('formKart')
-        fl = QHBoxLayout(filtre); fl.setContentsMargins(16,12,16,12); fl.setSpacing(12)
-
-        self.r_bas = tarih_input(); self.r_bas.setDate(QDate(QDate.currentDate().year(),1,1))
-        self.r_bit = tarih_input()
-
-        # Hızlı aralık butonları
-        b_bu_ay   = QPushButton('Bu Ay');   b_bu_ay.setObjectName('btnTehlike')
-        b_bu_yil  = QPushButton('Bu Yıl');  b_bu_yil.setObjectName('btnTehlike')
-        b_tumu    = QPushButton('Tümü');    b_tumu.setObjectName('btnTehlike')
-        b_filtrele = btn('🔍  Uygula')
-        b_temizle  = btn('🔄  Temizle', 'btnTehlike')
-
-        bugun = QDate.currentDate()
-        b_bu_ay.clicked.connect(lambda: (
-            self.r_bas.setDate(QDate(bugun.year(), bugun.month(), 1)),
-            self.r_bit.setDate(bugun),
-            self.raporlar_yukle()
-        ))
-        b_bu_yil.clicked.connect(lambda: (
-            self.r_bas.setDate(QDate(bugun.year(), 1, 1)),
-            self.r_bit.setDate(bugun),
-            self.raporlar_yukle()
-        ))
-        b_tumu.clicked.connect(lambda: (
-            self.r_bas.setDate(QDate(2000, 1, 1)),
-            self.r_bit.setDate(bugun),
-            self.raporlar_yukle()
-        ))
-        b_filtrele.clicked.connect(self.raporlar_yukle)
-        b_temizle.clicked.connect(lambda: (
-            self.r_bas.setDate(QDate(bugun.year(), 1, 1)),
-            self.r_bit.setDate(bugun),
-            self.raporlar_yukle()
-        ))
-
-        fl.addWidget(etiket_input('Başlangıç', self.r_bas))
-        fl.addWidget(etiket_input('Bitiş',     self.r_bit))
-        fl.addWidget(b_bu_ay); fl.addWidget(b_bu_yil); fl.addWidget(b_tumu)
-        fl.addWidget(b_filtrele); fl.addWidget(b_temizle)
-        fl.addStretch()
-        ana.addWidget(filtre)
-
-        # Rapor kartları
         grid = QGridLayout(); grid.setSpacing(14)
-        self.rapor_aylik    = self._rapor_kart('📅  Aylık Gelir - Gider Özeti')
-        self.rapor_kategori = self._rapor_kart('📂  Kategori Bazlı Dağılım')
-        self.rapor_top      = self._rapor_kart('⭐  En Çok Kullanılan Kalemler (Top 5)')
-        self.rapor_genel    = self._rapor_kart('📊  Dönem Özeti')
+        self.rapor_aylik    = self._rapor_kart("📅  Aylık Gelir - Gider Özeti")
+        self.rapor_kategori = self._rapor_kart("📂  Kategori Bazlı Dağılım")
+        self.rapor_top      = self._rapor_kart("⭐  En Çok Kullanılan Kalemler (Top 5)")
+        self.rapor_genel    = self._rapor_kart("📊  Genel Özet")
 
         grid.addWidget(self.rapor_aylik[0],    0, 0)
         grid.addWidget(self.rapor_kategori[0], 0, 1)
@@ -1124,86 +1079,69 @@ class AnaPencere(QMainWindow):
         return w
 
     def _rapor_kart(self, baslik):
-        frame = QFrame(); frame.setObjectName('formKart')
+        frame = QFrame(); frame.setObjectName("formKart")
         lay = QVBoxLayout(frame); lay.setContentsMargins(18,16,18,16); lay.setSpacing(4)
-        lbl = QLabel(baslik); lbl.setObjectName('formBaslik')
+        lbl = QLabel(baslik); lbl.setObjectName("formBaslik")
         sep = QFrame(); sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet('color:#2a3050; margin:4px 0;')
+        sep.setStyleSheet("color:#2a3050; margin:4px 0;")
         icerik = QVBoxLayout()
         lay.addWidget(lbl); lay.addWidget(sep); lay.addLayout(icerik)
         return frame, icerik
 
     def raporlar_yukle(self):
-        bas = self.r_bas.date().toString('yyyy-MM-dd')
-        bit = self.r_bit.date().toString('yyyy-MM-dd')
-
         # Aylık
         _, lay = self.rapor_aylik
         self._lay_temizle(lay)
-        for a in db.aylik_ozet(bas, bit):
+        for a in db.aylik_ozet():
             net = a['gelir'] - a['gider']
-            # yyyy-MM → Ay Yıl formatına çevir
-            try:
-                from datetime import datetime as dt
-                ay_lbl = dt.strptime(a['ay'], '%Y-%m').strftime('%B %Y')
-            except:
-                ay_lbl = a['ay']
             satir = QHBoxLayout()
-            satir.addWidget(QLabel(f"{ay_lbl}  ({a['sayi']} işlem)"))
+            satir.addWidget(QLabel(f"{a['ay']}  ({a['sayi']} işlem)"))
             v = QLabel(para_format(net))
-            v.setStyleSheet(f"color:{'#2eca8b' if net>=0 else '#ff4d6d'}; font-weight:700;")
+            renk_net = '#2eca8b' if net >= 0 else '#ff4d6d'
+            v.setStyleSheet(f'color:{renk_net}; font-weight:700;')
             v.setAlignment(Qt.AlignRight)
             satir.addWidget(v); lay.addLayout(satir)
             alt = QLabel(f"   Gelir: {para_format(a['gelir'])}   |   Gider: {para_format(a['gider'])}")
             alt.setStyleSheet('color:#5a6480; font-size:11px;')
             lay.addWidget(alt)
-        if lay.count() == 0: lay.addWidget(QLabel('Bu dönemde veri yok.'))
+        if lay.count() == 0: lay.addWidget(QLabel('Veri yok.'))
 
         # Kategori
         _, lay = self.rapor_kategori
         self._lay_temizle(lay)
         renk = {'Gelir':'#2eca8b','Gider':'#ff4d6d','Kasa Giriş':'#5b9aff'}
-        for k in db.kategori_dagilim(bas, bit):
+        for k in db.kategori_dagilim():
             satir = QHBoxLayout()
+            tur_renk = renk.get(k['tur'], '#e8ecf4')
             lbl = QLabel(f"[{k['tur']}]  {k['ana_kategori']}")
-            lbl.setStyleSheet(f"color:{renk.get(k['tur'],'#e8ecf4')};")
+            lbl.setStyleSheet(f'color:{tur_renk};')
             v = QLabel(para_format(k['tutar'])); v.setAlignment(Qt.AlignRight)
             v.setStyleSheet('font-weight:700;')
             satir.addWidget(lbl); satir.addWidget(v); lay.addLayout(satir)
-        if lay.count() == 0: lay.addWidget(QLabel('Bu dönemde veri yok.'))
+        if lay.count() == 0: lay.addWidget(QLabel('Veri yok.'))
 
         # Top kalemler
         _, lay = self.rapor_top
         self._lay_temizle(lay)
-        for i, k in enumerate(db.top_kalemler(5, bas, bit), 1):
+        for i, k in enumerate(db.top_kalemler(5), 1):
             satir = QHBoxLayout()
             satir.addWidget(QLabel(f"{i}. {k['kalem_adi']}  ({k['sayi']}x)"))
             v = QLabel(para_format(k['tutar'])); v.setAlignment(Qt.AlignRight)
             v.setStyleSheet('font-weight:700;')
             satir.addWidget(v); lay.addLayout(satir)
-        if lay.count() == 0: lay.addWidget(QLabel('Bu dönemde veri yok.'))
+        if lay.count() == 0: lay.addWidget(QLabel('Veri yok.'))
 
-        # Dönem özeti
+        # Genel özet
         _, lay = self.rapor_genel
         self._lay_temizle(lay)
-
-        # Dönem başlığı
-        bas_lbl = self.r_bas.date().toString('dd.MM.yyyy')
-        bit_lbl = self.r_bit.date().toString('dd.MM.yyyy')
-        donem = QLabel(f"📆  {bas_lbl} — {bit_lbl}")
-        donem.setStyleSheet('color:#5a6480; font-size:11px; margin-bottom:4px;')
-        lay.addWidget(donem)
-
-        ozet = db.genel_ozet(bas, bit)
+        ozet = db.genel_ozet()
         for label, val, renk_str in [
-            ('Toplam Hareket',  str(ozet['toplam_hareket']),      '#e8ecf4'),
-            ('Toplam Gelir',    para_format(ozet['toplam_gelir']), '#2eca8b'),
-            ('Toplam Gider',    para_format(ozet['toplam_gider']), '#ff4d6d'),
-            ('Kasa Girişleri',  para_format(ozet['kasa_giris']),   '#5b9aff'),
-            ('Dönem Net',       para_format(ozet['toplam_gelir'] - ozet['toplam_gider']),
-             '#2eca8b' if ozet['toplam_gelir'] >= ozet['toplam_gider'] else '#ff4d6d'),
-            ('Güncel Bakiye',   para_format(db.genel_ozet()['bakiye']), '#e8ecf4'),
-            ('Tanımlı Kalem',   str(ozet['kalem_sayisi']),         '#e8ecf4'),
+            ('Toplam Hareket',  str(ozet['toplam_hareket']),       '#e8ecf4'),
+            ('Toplam Gelir',    para_format(ozet['toplam_gelir']),  '#2eca8b'),
+            ('Toplam Gider',    para_format(ozet['toplam_gider']),  '#ff4d6d'),
+            ('Kasa Girişleri',  para_format(ozet['kasa_giris']),    '#5b9aff'),
+            ('Güncel Bakiye',   para_format(ozet['bakiye']),        '#e8ecf4'),
+            ('Tanımlı Kalem',   str(ozet['kalem_sayisi']),          '#e8ecf4'),
         ]:
             satir = QHBoxLayout()
             satir.addWidget(QLabel(label))
