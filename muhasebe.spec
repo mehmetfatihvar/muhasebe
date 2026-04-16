@@ -1,43 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec dosyası — Windows .exe üretir
-# Kullanım: pyinstaller muhasebe.spec
-
 import os
+
 datas_list = [
-    ('app/db/*.py', 'app/db'),
-    ('app/ui/*.py', 'app/ui'),
+    ("app/db/*.py", "app/db"),
+    ("app/ui/*.py", "app/ui"),
 ]
-if os.path.exists('assets/logo.ico'):
-    datas_list.append(('assets/logo.ico', 'assets'))
+if os.path.exists("assets/logo.ico"):
+    datas_list.append(("assets/logo.ico", "assets"))
 
-icon_path = 'assets/logo.ico' if os.path.exists('assets/logo.ico') else None
-
-block_cipher = None
+icon_path = "assets/logo.ico" if os.path.exists("assets/logo.ico") else None
+version_path = "version_info.txt" if os.path.exists("version_info.txt") else None
 
 a = Analysis(
-    ['main.py'],
-    pathex=['.'],
+    ["main.py"],
+    pathex=["."],
     binaries=[],
     datas=datas_list,
     hiddenimports=[
-        'PyQt5.QtCore',
-        'PyQt5.QtGui',
-        'PyQt5.QtWidgets',
-        'sqlite3',
-        'json',
-        'csv',
+        "PyQt5.QtCore",
+        "PyQt5.QtGui",
+        "PyQt5.QtWidgets",
+        "sqlite3",
+        "json",
+        "csv",
     ],
     hookspath=[],
-    hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib', 'numpy', 'pandas', 'scipy', 'tkinter'],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    excludes=["matplotlib", "numpy", "pandas", "scipy", "tkinter"],
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
@@ -46,19 +39,13 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='MuhasebeSistemi',
+    name="MuhasebeSistemi",
     debug=False,
-    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,           # Konsol penceresi çıkmaz
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
+    console=False,
     icon=icon_path,
-    version='version_info.txt',
+    version=version_path,
 )

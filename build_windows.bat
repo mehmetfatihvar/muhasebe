@@ -54,6 +54,9 @@ if exist "assets\logo.svg" (
 echo [3/4] .exe olusturuluyor, lutfen bekleyin...
 python -m PyInstaller muhasebe.spec --noconfirm --clean
 if %errorlevel% equ 0 goto basarili
+echo [HATA] Build basarisiz - yukaridaki hataya bakin.
+pause
+exit /b 1
 
 for /f "delims=" %%i in ('python -c "import sys,os; print(os.path.join(os.path.dirname(sys.executable), 'Scripts', 'pyinstaller.exe'))"') do set PYINST=%%i
 if exist "%PYINST%" (
