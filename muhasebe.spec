@@ -2,17 +2,23 @@
 # PyInstaller spec dosyası — Windows .exe üretir
 # Kullanım: pyinstaller muhasebe.spec
 
+import os
+datas_list = [
+    ('app/db/*.py', 'app/db'),
+    ('app/ui/*.py', 'app/ui'),
+]
+if os.path.exists('assets/logo.ico'):
+    datas_list.append(('assets/logo.ico', 'assets'))
+
+icon_path = 'assets/logo.ico' if os.path.exists('assets/logo.ico') else None
+
 block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[
-        ('app/db/*.py', 'app/db'),
-        ('app/ui/*.py', 'app/ui'),
-        ('assets/logo.ico', 'assets'),
-    ],
+    datas=datas_list,
     hiddenimports=[
         'PyQt5.QtCore',
         'PyQt5.QtGui',
@@ -53,6 +59,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/logo.ico',  # Logo eklenince aktif olur
+    icon=icon_path,
     version='version_info.txt',
 )

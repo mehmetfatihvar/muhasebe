@@ -61,8 +61,7 @@ if exist "%PYINST%" (
     if %errorlevel% equ 0 goto basarili
 )
 
-echo [HATA] PyInstaller bulunamadi!
-echo Lutfen: pip install pyinstaller --force-reinstall
+echo [HATA] Build basarisiz! Yukaridaki hata mesajini okuyun.
 pause
 exit /b 1
 
