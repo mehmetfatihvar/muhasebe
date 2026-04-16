@@ -147,6 +147,8 @@ tr:hover td { background:var(--surface2); }
     <button class="nav-btn" onclick="showPage('raporlar')">📈 Raporlar</button>
   </div>
   <button class="btn btn-danger" onclick="yedekle()">💾 Yedekle</button>
+  <button class="btn btn-danger" onclick="document.getElementById('yukleInput').click()">📂 Yedek Yükle</button>
+  <input type="file" id="yukleInput" accept=".json" style="display:none" onchange="yedekYukle(event)">
 </div>
 
 <!-- KPI BAR -->
@@ -853,6 +855,32 @@ function yedekle() {
   a.download = 'muhasebe_yedek_'+new Date().toISOString().slice(0,10)+'.json';
   a.click();
   toast('Yedek dosyası indirildi!');
+}
+
+// ==================== YEDEK YÜKLE ====================
+function yedekYukle(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const veri = JSON.parse(e.target.result);
+      if (!veri.kalemler || !veri.hareketler) {
+        toast('Geçersiz yedek dosyası!', true); return;
+      }
+      if (!confirm(`Yedek dosyasında ${veri.hareketler.length} hareket ve ${veri.kalemler.length} kalem var.\n\nMevcut verinin üzerine yazılacak. Devam etmek istiyor musunuz?`)) return;
+      state = veri;
+      kaydet();
+      kpiGuncelle();
+      renderSonHareketler();
+      toast('✅ Yedek başarıyla yüklendi! ' + veri.hareketler.length + ' hareket geri getirildi.');
+      showPage('anasayfa');
+    } catch(err) {
+      toast('Dosya okunamadı: ' + err.message, true);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // aynı dosyayı tekrar seçebilmek için sıfırla
 }
 
 // ==================== EXCEL AKTAR ====================
