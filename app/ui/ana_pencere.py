@@ -357,6 +357,7 @@ class AnaPencere(QMainWindow):
         if tur == '-- Seçiniz --' or not ana or not alt or not ad:
             QMessageBox.warning(self, 'Eksik Alan', '(*) işaretli alanları doldurun!'); return
         db.kalem_ekle(tur, ana, alt, ad, self.kt_aciklama.text().strip())
+        self._h_filtre_hazir = False  # filtre dropdown'larını yenile
         self._kategori_yenile()
         self.kalemler_yukle()
         self._kalem_temizle()
@@ -492,27 +493,43 @@ class AnaPencere(QMainWindow):
     def hareketler_yukle(self, liste=None):
         if liste is None:
             liste = db.hareket_listesi()
+        tbl = self.tbl_hareketler
         self.h_sayisi.setText(f'{len(liste)} Kayıt')
-        tbl = self.tbl_hareketler; tbl.setRowCount(0)
-        renk = {'Gelir':'#2eca8b','Gider':'#ff4d6d','Kasa Giriş':'#5b9aff'}
-        for h in liste:
-            row = tbl.rowCount(); tbl.insertRow(row)
-            vals = [h['islem_no'], h['tarih'], h['tur'], h['ana_kategori'],
-                    h['kalem_adi'], h.get('aciklama',''),
-                    para_format(h['tutar']),
-                    para_format(h['giris']) if h['giris'] else '-',
-                    para_format(h['cikis']) if h['cikis'] else '-',
-                    h.get('kimden_kime',''), h.get('odeme_turu',''),
-                    h.get('belge_no',''), para_format(h['bakiye']), h.get('durum','✅')]
+
+        # UI güncellemelerini dondur — toplu yazım çok daha hızlı
+        tbl.setUpdatesEnabled(False)
+        tbl.setSortingEnabled(False)
+        tbl.clearContents()
+        tbl.setRowCount(len(liste))
+
+        renk = {'Gelir':QColor('#2eca8b'),'Gider':QColor('#ff4d6d'),'Kasa Giriş':QColor('#5b9aff')}
+        sag  = Qt.AlignRight | Qt.AlignVCenter
+
+        for row, h in enumerate(liste):
+            vals = [
+                h['islem_no'], h['tarih'], h['tur'], h['ana_kategori'],
+                h['kalem_adi'], h.get('aciklama',''),
+                para_format(h['tutar']),
+                para_format(h['giris']) if h['giris'] else '-',
+                para_format(h['cikis']) if h['cikis'] else '-',
+                h.get('kimden_kime',''), h.get('odeme_turu',''),
+                h.get('belge_no',''), para_format(h['bakiye']), h.get('durum','✅')
+            ]
             for c, v in enumerate(vals):
-                item = QTableWidgetItem(str(v)); item.setFlags(Qt.ItemIsEnabled)
-                if c == 2: item.setForeground(QColor(renk.get(v,'#e8ecf4')))
-                if c in (6,7,8,12): item.setTextAlignment(Qt.AlignRight|Qt.AlignVCenter)
+                item = QTableWidgetItem(str(v))
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                if c == 2 and v in renk:
+                    item.setForeground(renk[v])
+                if c in (6, 7, 8, 12):
+                    item.setTextAlignment(sag)
                 tbl.setItem(row, c, item)
+
             b_sil = QPushButton('🗑️'); b_sil.setObjectName('btnSil')
             hid = h['id']
             b_sil.clicked.connect(lambda _, i=hid: self._hareket_sil(i))
             tbl.setCellWidget(row, 14, b_sil)
+
+        tbl.setUpdatesEnabled(True)
 
     def hareketler_filtrele(self):
         bas      = self.f_bas.date().toString('yyyy-MM-dd')
@@ -787,13 +804,21 @@ class AnaPencere(QMainWindow):
 
     def _tab_degisti(self, idx):
         self.kpi_guncelle()
-        if idx == 0: self.son_hareketler_yukle()
-        elif idx == 4: self.kalemler_yukle()
+        if idx == 0:
+            self.son_hareketler_yukle()
+        elif idx == 4:
+            self.kalemler_yukle()
         elif idx == 5:
-            self._filtre_kategori_guncelle(self.f_tur.currentText())
-            self.hareketler_yukle()
-        elif idx == 6: self.tablo_filtrele()
-        elif idx == 7: self.raporlar_yukle()
+            # Dropdown'ları sadece ilk açılışta veya kalem eklenince doldur
+            if not hasattr(self, '_h_filtre_hazir') or not self._h_filtre_hazir:
+                self._filtre_kategori_guncelle(self.f_tur.currentText())
+                self._h_filtre_hazir = True
+            # Tabloyu UI render edildikten sonra yükle (donma önleme)
+            QTimer.singleShot(0, self.hareketler_yukle)
+        elif idx == 6:
+            QTimer.singleShot(0, self.tablo_filtrele)
+        elif idx == 7:
+            QTimer.singleShot(0, self.raporlar_yukle)
 
     # ─────────────────────────── YEDEK ─────────────────────────────────
     def yedekle(self):
