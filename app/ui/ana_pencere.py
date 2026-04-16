@@ -446,8 +446,9 @@ class AnaPencere(QMainWindow):
         if tur == '-- Seçiniz --' or not ana or not alt or not ad:
             QMessageBox.warning(self, 'Eksik Alan', '(*) işaretli alanları doldurun!'); return
         db.kalem_ekle(tur, ana, alt, ad, self.kt_aciklama.text().strip())
-        self._h_filtre_hazir = False  # filtre dropdown'larını yenile
+        self._h_filtre_hazir = False
         self._kategori_yenile()
+        self.filtre_dropdownlari_yenile()
         self.kalemler_yukle()
         self._kalem_temizle()
         self.status.showMessage(f'✅ Kalem eklendi: {ad}', 3000)
@@ -481,6 +482,7 @@ class AnaPencere(QMainWindow):
             db.kalem_sil(kid)
             self.kalemler_yukle()
             self._kategori_yenile()
+            self.filtre_dropdownlari_yenile()
             self.status.showMessage('Kalem silindi.', 3000)
 
     # ─────────────────────────── TÜM HAREKETLER ────────────────────────
@@ -553,31 +555,55 @@ class AnaPencere(QMainWindow):
         return w
 
     def _filtre_kategori_guncelle(self, tur_text):
-        """İşlem türü değişince ana kategori dropdown'ını güncelle"""
+        """İşlem türü değişince ana kategori dropdown'ını kalem tanımlarından doldur"""
+        onceki = self.f_ana_kat.currentText()
         self.f_ana_kat.blockSignals(True)
-        self.f_ana_kat.clear(); self.f_ana_kat.addItem('Tüm Kategoriler')
+        self.f_ana_kat.clear()
+        self.f_ana_kat.addItem('Tüm Kategoriler')
+
         tur = None if tur_text == 'Tümü' else tur_text
         kalemler = db.kalem_listesi()
         kategoriler = sorted(set(
-            k['ana_kategori'] for k in kalemler if (tur is None or k['tur'] == tur)
+            k['ana_kategori'] for k in kalemler
+            if (tur is None or k['tur'] == tur)
         ))
-        for k in kategoriler: self.f_ana_kat.addItem(k)
+        for k in kategoriler:
+            self.f_ana_kat.addItem(k)
+
+        # Önceki seçimi koru (hâlâ listede varsa)
+        idx = self.f_ana_kat.findText(onceki)
+        self.f_ana_kat.setCurrentIndex(idx if idx >= 0 else 0)
         self.f_ana_kat.blockSignals(False)
         self._filtre_kalem_guncelle(self.f_ana_kat.currentText())
 
     def _filtre_kalem_guncelle(self, ana_text):
-        """Ana kategori değişince kalem dropdown'ını güncelle"""
-        self.f_kalem.clear(); self.f_kalem.addItem('Tüm Kalemler')
+        """Ana kategori değişince kalem dropdown'ını kalem tanımlarından doldur"""
+        onceki = self.f_kalem.currentText()
+        self.f_kalem.blockSignals(True)
+        self.f_kalem.clear()
+        self.f_kalem.addItem('Tüm Kalemler')
+
         tur_text = self.f_tur.currentText()
         tur = None if tur_text == 'Tümü' else tur_text
         ana = None if ana_text == 'Tüm Kategoriler' else ana_text
+
         kalemler = db.kalem_listesi()
-        filtreli = [
+        filtreli = sorted(set(
             k['kalem_adi'] for k in kalemler
             if (tur is None or k['tur'] == tur)
             and (ana is None or k['ana_kategori'] == ana)
-        ]
-        for k in sorted(set(filtreli)): self.f_kalem.addItem(k)
+        ))
+        for k in filtreli:
+            self.f_kalem.addItem(k)
+
+        # Önceki seçimi koru
+        idx = self.f_kalem.findText(onceki)
+        self.f_kalem.setCurrentIndex(idx if idx >= 0 else 0)
+        self.f_kalem.blockSignals(False)
+
+    def filtre_dropdownlari_yenile(self):
+        """Kalem ekleme/silme sonrası tüm filtre dropdown'larını yenile"""
+        self._filtre_kategori_guncelle(self.f_tur.currentText())
 
     def hareketler_yukle(self, liste=None):
         if liste is None:
@@ -898,11 +924,8 @@ class AnaPencere(QMainWindow):
         elif idx == 4:
             self.kalemler_yukle()
         elif idx == 5:
-            # Dropdown'ları sadece ilk açılışta veya kalem eklenince doldur
-            if not hasattr(self, '_h_filtre_hazir') or not self._h_filtre_hazir:
-                self._filtre_kategori_guncelle(self.f_tur.currentText())
-                self._h_filtre_hazir = True
-            # Tabloyu UI render edildikten sonra yükle (donma önleme)
+            # Her geçişte filtre dropdown'larını kalem tanımlarından tazele
+            self.filtre_dropdownlari_yenile()
             QTimer.singleShot(0, self.hareketler_yukle)
         elif idx == 6:
             QTimer.singleShot(0, self.tablo_filtrele)
