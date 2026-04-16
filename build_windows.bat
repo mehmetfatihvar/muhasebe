@@ -6,24 +6,21 @@ echo    Muhasebe Sistemi - Windows Build Script
 echo ================================================
 echo.
 
-:: Python kontrolu
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [HATA] Python bulunamadi. https://python.org adresinden yukleyin.
     pause & exit /b 1
 )
 
-:: Kutuphaneleri yukle
 echo [1/4] Kutuphaneler yukleniyor...
 pip install PyQt5 pyinstaller pillow --quiet --no-warn-script-location
 if errorlevel 1 ( echo [HATA] Kutuphane yuklenemedi. & pause & exit /b 1 )
 echo       Tamam.
 
-:: Logo donustur
 echo [2/4] Logo kontrol ediliyor...
 if exist "assets\logo.png" (
     python logo_convert.py assets\logo.png
-    echo       Logo .ico formatina donusturuldu.
+    echo       Tum formatlar olusturuldu.
 ) else if exist "assets\logo.ico" (
     echo       Mevcut .ico kullaniliyor.
 ) else (
@@ -31,31 +28,19 @@ if exist "assets\logo.png" (
     powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", '' | Set-Content muhasebe.spec"
 )
 
-:: PyInstaller yolunu bul ve calistir
 echo [3/4] .exe olusturuluyor, lutfen bekleyin...
 
-:: Yontem 1: python -m ile
 python -m PyInstaller muhasebe.spec --noconfirm --clean >nul 2>&1
 if not errorlevel 1 goto basarili
 
-:: Yontem 2: Scripts klasorunden direkt
 for /f "delims=" %%i in ('python -c "import sys,os; print(os.path.join(os.path.dirname(sys.executable), 'Scripts', 'pyinstaller.exe'))"') do set PYINST=%%i
 if exist "%PYINST%" (
     "%PYINST%" muhasebe.spec --noconfirm --clean
     if not errorlevel 1 goto basarili
 )
 
-:: Yontem 3: AppData Scripts klasoru
-for /f "delims=" %%i in ('python -c "import site; print(site.getusersitepackages())"') do set SITE=%%i
-set PYINST2=%SITE%\..\..\Scripts\pyinstaller.exe
-if exist "%PYINST2%" (
-    "%PYINST2%" muhasebe.spec --noconfirm --clean
-    if not errorlevel 1 goto basarili
-)
-
 echo [HATA] PyInstaller bulunamadi!
-echo Lutfen su komutu calistirin ve tekrar deneyin:
-echo    pip install pyinstaller --force-reinstall
+echo Lutfen: pip install pyinstaller --force-reinstall
 pause & exit /b 1
 
 :basarili
