@@ -18,19 +18,34 @@ if errorlevel 1 ( echo [HATA] Kutuphane yuklenemedi. & pause & exit /b 1 )
 echo       Tamam.
 
 echo [2/4] Logo kontrol ediliyor...
-if exist "assets\logo.png" (
-    python logo_convert.py assets\logo.png
-    echo       Tum formatlar olusturuldu.
+if exist "assets\logo.svg" (
+    echo       SVG logo bulundu, ICO donusturuluyor...
+    pip install cairosvg --quiet --no-warn-script-location
+    python logo_convert.py assets\logo.svg --cikti assets\logo.ico
+    if errorlevel 1 ( echo [HATA] SVG donusturulemedi. & pause & exit /b 1 )
+    echo       Logo hazir.
+) else if exist "assets\logo.png" (
+    echo       PNG logo bulundu, ICO donusturuluyor...
+    python logo_convert.py assets\logo.png --cikti assets\logo.ico
+    if errorlevel 1 ( echo [HATA] PNG donusturulemedi. & pause & exit /b 1 )
+    echo       Logo hazir.
+) else if exist "assets\logo.jpg" (
+    echo       JPG logo bulundu, ICO donusturuluyor...
+    python logo_convert.py assets\logo.jpg --cikti assets\logo.ico
+    if errorlevel 1 ( echo [HATA] JPG donusturulemedi. & pause & exit /b 1 )
+    echo       Logo hazir.
 ) else if exist "assets\logo.ico" (
-    echo       Mevcut .ico kullaniliyor.
+    echo       Hazir ICO kullaniliyor.
 ) else (
-    echo       Logo bulunamadi - varsayilan simge kullanilacak.
-    powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", '' | Set-Content muhasebe.spec"
+    echo       [UYARI] assets\ klasorunde logo bulunamadi.
+    echo       Logo olmadan devam ediliyor...
+    :: spec dosyasindan icon ve assets satırını kaldır
+    powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", \"icon=None,\" | Set-Content muhasebe.spec"
+    powershell -Command "(Get-Content muhasebe.spec) -replace \".*assets/logo.ico.*\n\", '' | Set-Content muhasebe.spec"
 )
 
 echo [3/4] .exe olusturuluyor, lutfen bekleyin...
-
-python -m PyInstaller muhasebe.spec --noconfirm --clean >nul 2>&1
+python -m PyInstaller muhasebe.spec --noconfirm --clean
 if not errorlevel 1 goto basarili
 
 for /f "delims=" %%i in ('python -c "import sys,os; print(os.path.join(os.path.dirname(sys.executable), 'Scripts', 'pyinstaller.exe'))"') do set PYINST=%%i

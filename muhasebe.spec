@@ -11,6 +11,7 @@ a = Analysis(
     datas=[
         ('app/db/*.py', 'app/db'),
         ('app/ui/*.py', 'app/ui'),
+        ('assets/logo.ico', 'assets'),
     ],
     hiddenimports=[
         'PyQt5.QtCore',
