@@ -119,21 +119,23 @@ class AnaPencere(QMainWindow):
 
     # ─────────────────────────── ÜST BAR ───────────────────────────────
     def _ust_bar(self):
-        bar = QFrame(); bar.setFixedHeight(56)
+        bar = QFrame(); bar.setFixedHeight(62)
         bar.setStyleSheet('background:#181c27; border-bottom:1px solid #2a3050;')
-        lay = QHBoxLayout(bar); lay.setContentsMargins(20, 0, 20, 0); lay.setSpacing(12)
+        lay = QHBoxLayout(bar); lay.setContentsMargins(24, 0, 24, 0); lay.setSpacing(14)
 
         marka = QLabel('🏢  MUHASEBE SİSTEMİ')
-        marka.setStyleSheet('font-size:15px; font-weight:700; color:#5b9aff;')
+        marka.setStyleSheet('font-size:18px; font-weight:700; color:#5b9aff; letter-spacing:1px;')
         lay.addWidget(marka)
         lay.addStretch()
 
-        b_yedek = QPushButton('💾  Yedekle'); b_yedek.setObjectName('btnTehlike')
-        b_yedek.clicked.connect(self.yedekle)
-        b_yukle = QPushButton('📂  Yedek Yükle'); b_yukle.setObjectName('btnTehlike')
-        b_yukle.clicked.connect(self.yedek_yukle)
-
-        lay.addWidget(b_yedek); lay.addWidget(b_yukle)
+        for txt, slot, oid in [
+            ('💾  Yedekle',    self.yedekle,    'btnTehlike'),
+            ('📂  Yedek Yükle', self.yedek_yukle, 'btnTehlike'),
+        ]:
+            b = QPushButton(txt); b.setObjectName(oid)
+            b.setStyleSheet('font-size:14px; padding:8px 18px;')
+            b.clicked.connect(slot)
+            lay.addWidget(b)
         return bar
 
     # ─────────────────────────── KPI BAR ───────────────────────────────
@@ -202,8 +204,52 @@ class AnaPencere(QMainWindow):
     # ─────────────────────────── ANA SAYFA ─────────────────────────────
     def _tab_anasayfa(self):
         w = QWidget(); lay = QVBoxLayout(w); lay.setContentsMargins(20,16,20,20); lay.setSpacing(14)
-        baslik = QLabel('Son Hareketler'); baslik.setObjectName('baslik')
-        lay.addWidget(baslik)
+
+        # Hızlı erişim butonları
+        hizli_baslik = QLabel('Hızlı Erişim'); hizli_baslik.setObjectName('baslik')
+        lay.addWidget(hizli_baslik)
+
+        btn_grid = QGridLayout(); btn_grid.setSpacing(10)
+        kisayollar = [
+            ('➕', 'Gider Ekle',           'Yeni gider kaydı',       1),
+            ('💰', 'Gelir Ekle',           'Yeni gelir kaydı',       2),
+            ('🏦', 'Kasaya Para Girişi',   'Sermaye / tahsilat',     3),
+            ('📋', 'Kalem Tanımları',      'Kategori yönetimi',      4),
+            ('🗂', 'Tüm Hareketler',       'Kayıtları görüntüle',    5),
+            ('📊', 'Gelir/Gider Tablosu', 'Filtreli özet',          6),
+            ('📈', 'Raporlar',             'Aylık & kategori özeti', 7),
+        ]
+        for i, (ikon, ad, aciklama, tab_idx) in enumerate(kisayollar):
+            kart = QFrame(); kart.setObjectName('formKart')
+            kart.setCursor(Qt.PointingHandCursor)
+            kart.setFixedHeight(80)
+            klay = QHBoxLayout(kart); klay.setContentsMargins(16, 10, 16, 10); klay.setSpacing(12)
+
+            ikon_lbl = QLabel(ikon)
+            ikon_lbl.setStyleSheet('font-size:24px;')
+            ikon_lbl.setFixedWidth(36)
+
+            metin = QWidget(); mlay = QVBoxLayout(metin); mlay.setContentsMargins(0,0,0,0); mlay.setSpacing(2)
+            ad_lbl = QLabel(ad); ad_lbl.setStyleSheet('font-size:13px; font-weight:700; color:#e8ecf4;')
+            ac_lbl = QLabel(aciklama); ac_lbl.setStyleSheet('font-size:11px; color:#5a6480;')
+            mlay.addWidget(ad_lbl); mlay.addWidget(ac_lbl)
+
+            klay.addWidget(ikon_lbl); klay.addWidget(metin); klay.addStretch()
+
+            # Hover efekti
+            kart.setStyleSheet("""
+                QFrame#formKart { background:#181c27; border:1px solid #2a3050; border-radius:10px; }
+                QFrame#formKart:hover { border-color:#3d7fff; background:#1e2333; }
+            """)
+            # Tıklama için eventFilter
+            kart.mousePressEvent = lambda e, idx=tab_idx: self.tabs.setCurrentIndex(idx)
+            btn_grid.addWidget(kart, i // 4, i % 4)
+
+        lay.addLayout(btn_grid)
+
+        # Son hareketler
+        son_baslik = QLabel('Son Hareketler'); son_baslik.setObjectName('baslik')
+        lay.addWidget(son_baslik)
         self.tbl_son = self._tablo(['İşlem No','Tarih','Tür','Kategori','Kalem','Tutar','Bakiye','Durum'])
         lay.addWidget(self.tbl_son)
         return w
@@ -226,7 +272,9 @@ class AnaPencere(QMainWindow):
         self.g_tutar = tutar_input()
         self.g_odeme = combo()
         for o in ['Nakit','Havale/EFT','Kredi Kartı','Çek','Senet']: self.g_odeme.addItem(o)
-        self.g_kime   = QLineEdit(); self.g_kime.setPlaceholderText('Ad / Şirket')
+        self.g_kime = QComboBox(); self.g_kime.setEditable(True)
+        self.g_kime.setInsertPolicy(QComboBox.NoInsert)
+        self.g_kime.lineEdit().setPlaceholderText('Ad / Şirket')
         self.g_belge  = QLineEdit(); self.g_belge.setPlaceholderText('FIS-001')
         self.g_aciklama = QTextEdit(); self.g_aciklama.setMaximumHeight(70)
         self.g_aciklama.setPlaceholderText('İsteğe bağlı not...')
@@ -265,11 +313,12 @@ class AnaPencere(QMainWindow):
             'tarih': tarih, 'tur': 'Gider',
             'ana': kat, 'alt': k.get('alt_kategori',''), 'kalem': alt,
             'aciklama': self.g_aciklama.toPlainText(),
-            'tutar': tutar, 'kimden': self.g_kime.text(),
+            'tutar': tutar, 'kimden': self.g_kime.currentText().strip(),
             'odeme': odeme, 'belge': self.g_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
+        QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Gider kaydedildi: {no}', 4000)
         self._gider_temizle()
 
@@ -277,7 +326,8 @@ class AnaPencere(QMainWindow):
         self.g_tarih.setDate(QDate.currentDate())
         self.g_kat.setCurrentIndex(0); self.g_alt.clear(); self.g_alt.addItem('-- Seçiniz --')
         self.g_tutar.setValue(0); self.g_odeme.setCurrentIndex(0)
-        self.g_kime.clear(); self.g_belge.clear(); self.g_aciklama.clear()
+        self.g_kime.setCurrentIndex(0); self.g_kime.lineEdit().clear()
+        self.g_belge.clear(); self.g_aciklama.clear()
 
     # ─────────────────────────── GELİR ─────────────────────────────────
     def _tab_gelir(self):
@@ -292,7 +342,9 @@ class AnaPencere(QMainWindow):
         self.gl_tutar   = tutar_input()
         self.gl_tahsilat = combo()
         for o in ['Nakit','Havale/EFT','Kredi Kartı','Çek','Senet']: self.gl_tahsilat.addItem(o)
-        self.gl_kimden  = QLineEdit(); self.gl_kimden.setPlaceholderText('Ad / Şirket')
+        self.gl_kimden = QComboBox(); self.gl_kimden.setEditable(True)
+        self.gl_kimden.setInsertPolicy(QComboBox.NoInsert)
+        self.gl_kimden.lineEdit().setPlaceholderText('Ad / Şirket')
         self.gl_belge   = QLineEdit(); self.gl_belge.setPlaceholderText('FAT-001')
         self.gl_aciklama = QTextEdit(); self.gl_aciklama.setMaximumHeight(70)
 
@@ -330,11 +382,12 @@ class AnaPencere(QMainWindow):
             'tarih': tarih, 'tur': 'Gelir',
             'ana': kat, 'alt': k.get('alt_kategori',''), 'kalem': alt,
             'aciklama': self.gl_aciklama.toPlainText(),
-            'tutar': tutar, 'kimden': self.gl_kimden.text(),
+            'tutar': tutar, 'kimden': self.gl_kimden.currentText().strip(),
             'odeme': tahsilat, 'belge': self.gl_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
+        QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Gelir kaydedildi: {no}', 4000)
         self._gelir_temizle()
 
@@ -342,7 +395,8 @@ class AnaPencere(QMainWindow):
         self.gl_tarih.setDate(QDate.currentDate())
         self.gl_kat.setCurrentIndex(0); self.gl_alt.clear(); self.gl_alt.addItem('-- Seçiniz --')
         self.gl_tutar.setValue(0); self.gl_tahsilat.setCurrentIndex(0)
-        self.gl_kimden.clear(); self.gl_belge.clear(); self.gl_aciklama.clear()
+        self.gl_kimden.setCurrentIndex(0); self.gl_kimden.lineEdit().clear()
+        self.gl_belge.clear(); self.gl_aciklama.clear()
 
     # ─────────────────────────── KASA ──────────────────────────────────
     def _tab_kasa(self):
@@ -355,7 +409,9 @@ class AnaPencere(QMainWindow):
         self.k_tur.currentTextChanged.connect(lambda t: self._alt_doldur(self.k_tur, self.k_alt, 'Kasa Giriş'))
         self.k_alt    = combo()
         self.k_tutar  = tutar_input()
-        self.k_kimden = QLineEdit(); self.k_kimden.setPlaceholderText('Ad / Şirket *')
+        self.k_kimden = QComboBox(); self.k_kimden.setEditable(True)
+        self.k_kimden.setInsertPolicy(QComboBox.NoInsert)
+        self.k_kimden.lineEdit().setPlaceholderText('Ad / Şirket *')
         self.k_belge  = QLineEdit(); self.k_belge.setPlaceholderText('SER-001')
         self.k_aciklama = QTextEdit(); self.k_aciklama.setMaximumHeight(70)
 
@@ -383,7 +439,7 @@ class AnaPencere(QMainWindow):
         tur    = self.k_tur.currentText()
         alt    = self.k_alt.currentText()
         tutar  = self.k_tutar.value()
-        kimden = self.k_kimden.text().strip()
+        kimden = self.k_kimden.currentText().strip()
         if tur == '-- Seçiniz --' or alt == '-- Seçiniz --' or tutar == 0 or not kimden:
             QMessageBox.warning(self, 'Eksik Alan', '(*) işaretli alanları doldurun!'); return
         kalemler = db.alt_kalemler('Kasa Giriş', tur)
@@ -397,13 +453,16 @@ class AnaPencere(QMainWindow):
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
+        QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Kasa girişi kaydedildi: {no}', 4000)
         self._kasa_temizle()
 
     def _kasa_temizle(self):
         self.k_tarih.setDate(QDate.currentDate())
         self.k_tur.setCurrentIndex(0); self.k_alt.clear(); self.k_alt.addItem('-- Seçiniz --')
-        self.k_tutar.setValue(0); self.k_kimden.clear(); self.k_belge.clear(); self.k_aciklama.clear()
+        self.k_tutar.setValue(0)
+        self.k_kimden.setCurrentIndex(0); self.k_kimden.lineEdit().clear()
+        self.k_belge.clear(); self.k_aciklama.clear()
 
     # ─────────────────────────── KALEM TANIMLARI ───────────────────────
     def _tab_kalemler(self):
@@ -949,16 +1008,36 @@ class AnaPencere(QMainWindow):
         self.kpi_guncelle()
         if idx == 0:
             self.son_hareketler_yukle()
+        elif idx in (1, 2, 3):
+            # Gider/Gelir/Kasa — kişi listesini tazele
+            QTimer.singleShot(0, self._form_kisi_guncelle)
         elif idx == 4:
             self.kalemler_yukle()
         elif idx == 5:
-            # Her geçişte filtre dropdown'larını kalem tanımlarından tazele
             self.filtre_dropdownlari_yenile()
             QTimer.singleShot(0, self.hareketler_yukle)
         elif idx == 6:
             QTimer.singleShot(0, self.tablo_filtrele)
         elif idx == 7:
             QTimer.singleShot(0, self.raporlar_yukle)
+
+    def _form_kisi_guncelle(self):
+        """Gider/Gelir/Kasa formlarındaki kişi combo'larını mevcut hareket listesinden besle"""
+        kisiler = db.kisi_listesi()
+        for combo_w in (self.g_kime, self.gl_kimden, self.k_kimden):
+            onceki = combo_w.currentText().strip()
+            combo_w.blockSignals(True)
+            combo_w.clear()
+            combo_w.addItem('')
+            for k in kisiler:
+                combo_w.addItem(k)
+            if onceki:
+                idx = combo_w.findText(onceki)
+                if idx >= 0:
+                    combo_w.setCurrentIndex(idx)
+                else:
+                    combo_w.setCurrentText(onceki)
+            combo_w.blockSignals(False)
 
     # ─────────────────────────── YEDEK ─────────────────────────────────
     def yedekle(self):
