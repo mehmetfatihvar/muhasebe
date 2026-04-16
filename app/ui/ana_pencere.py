@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QComboBox, QLineEdit, QDateEdit, QTextEdit,
     QMessageBox, QFileDialog, QFrame, QGridLayout, QSizePolicy,
-    QScrollArea, QStatusBar, QDoubleSpinBox, QSplitter
+    QScrollArea, QStatusBar, QDoubleSpinBox, QSplitter, QApplication
 )
 from PyQt5.QtCore import Qt, QDate, QTimer
 from PyQt5.QtGui import QFont, QColor
@@ -22,8 +22,26 @@ class AnaPencere(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('🏢 Firma Muhasebe ve Kasa Takip Sistemi')
-        self.setMinimumSize(1280, 800)
         self.setStyleSheet(STYLESHEET)
+
+        # Ekran boyutuna göre başlangıç boyutu
+        ekran = QApplication.primaryScreen().availableGeometry()
+        self._ekran_w = ekran.width()
+        self._ekran_h = ekran.height()
+
+        # Minimum boyut ekrana göre
+        min_w = min(900,  int(self._ekran_w * 0.6))
+        min_h = min(600,  int(self._ekran_h * 0.6))
+        self.setMinimumSize(min_w, min_h)
+
+        # Başlangıç: ekranın %85'i, ortada
+        baslangic_w = int(self._ekran_w * 0.85)
+        baslangic_h = int(self._ekran_h * 0.85)
+        self.resize(baslangic_w, baslangic_h)
+        self.move(
+            (self._ekran_w - baslangic_w) // 2,
+            (self._ekran_h - baslangic_h) // 2
+        )
 
         # Durum çubuğu
         self.status = QStatusBar()
@@ -59,6 +77,46 @@ class AnaPencere(QMainWindow):
         self.kpi_guncelle()
         self.son_hareketler_yukle()
 
+    def resizeEvent(self, event):
+        """Pencere boyutu değişince font ve padding'i adapte et"""
+        super().resizeEvent(event)
+        w = self.width()
+        self._kpi_yeniden_duz(w)
+        if w < 1100:
+            self._adaptif_stil('kompakt')
+        elif w < 1500:
+            self._adaptif_stil('normal')
+        else:
+            self._adaptif_stil('genis')
+
+    def _adaptif_stil(self, mod):
+        if getattr(self, '_son_mod', None) == mod:
+            return  # değişmediyse uygulama
+        self._son_mod = mod
+
+        if mod == 'kompakt':
+            font_beden   = '12px'
+            kpi_beden    = '16px'
+            tab_padding  = '7px 12px'
+            kenar        = '12px'
+        elif mod == 'normal':
+            font_beden   = '13px'
+            kpi_beden    = '20px'
+            tab_padding  = '10px 18px'
+            kenar        = '20px'
+        else:  # genis
+            font_beden   = '14px'
+            kpi_beden    = '24px'
+            tab_padding  = '12px 24px'
+            kenar        = '28px'
+
+        ek_stil = f"""
+        QMainWindow, QWidget {{ font-size: {font_beden}; }}
+        QLabel#kpiDeger {{ font-size: {kpi_beden}; }}
+        QTabBar::tab {{ padding: {tab_padding}; }}
+        """
+        self.setStyleSheet(STYLESHEET + ek_stil)
+
     # ─────────────────────────── ÜST BAR ───────────────────────────────
     def _ust_bar(self):
         bar = QFrame(); bar.setFixedHeight(56)
@@ -84,16 +142,43 @@ class AnaPencere(QMainWindow):
         frame.setStyleSheet('background:#0f1117; padding:12px 20px 0px 20px;')
         grid = QGridLayout(frame); grid.setSpacing(10); grid.setContentsMargins(0,0,0,10)
 
-        self._kpi_kasa,  self._kpi_kasa_v  = kpi_kart('Güncel Kasa', '₺0', '#5b9aff')
-        self._kpi_gelir, self._kpi_gelir_v = kpi_kart('Bu Ay Gelir',  '₺0', '#2eca8b')
-        self._kpi_gider, self._kpi_gider_v = kpi_kart('Bu Ay Gider',  '₺0', '#ff4d6d')
-        self._kpi_net,   self._kpi_net_v   = kpi_kart('Net Durum',    '₺0', '#e8ecf4')
-        self._kpi_7gun,  self._kpi_7gun_v  = kpi_kart('Son 7 Gün',    '0 işlem', '#e8ecf4')
+        # Her kart eşit genişlik alsın
+        for col in range(5):
+            grid.setColumnStretch(col, 1)
+
+        self._kpi_kasa,  self._kpi_kasa_v  = kpi_kart('Güncel Kasa',  '₺0',     '#5b9aff')
+        self._kpi_gelir, self._kpi_gelir_v = kpi_kart('Bu Ay Gelir',  '₺0',     '#2eca8b')
+        self._kpi_gider, self._kpi_gider_v = kpi_kart('Bu Ay Gider',  '₺0',     '#ff4d6d')
+        self._kpi_net,   self._kpi_net_v   = kpi_kart('Net Durum',    '₺0',     '#e8ecf4')
+        self._kpi_7gun,  self._kpi_7gun_v  = kpi_kart('Son 7 Gün',    '0 işlem','#e8ecf4')
 
         for i, w in enumerate([self._kpi_kasa, self._kpi_gelir,
                                 self._kpi_gider, self._kpi_net, self._kpi_7gun]):
             grid.addWidget(w, 0, i)
+
+        # Pencere küçüldüğünde KPI'ları 2 satıra al
+        self._kpi_grid = grid
         return frame
+
+    def _kpi_yeniden_duz(self, genislik):
+        """Dar ekranda KPI'ları 2 satıra, geniş ekranda 1 satıra diz"""
+        kartlar = [self._kpi_kasa, self._kpi_gelir, self._kpi_gider,
+                   self._kpi_net, self._kpi_7gun]
+        g = self._kpi_grid
+        for k in kartlar:
+            g.removeWidget(k)
+
+        if genislik < 1000:
+            # 3 + 2 düzeni
+            pozlar = [(0,0),(0,1),(0,2),(1,0),(1,1)]
+            for col in range(3): g.setColumnStretch(col, 1)
+        else:
+            # 5'li tek satır
+            pozlar = [(0,0),(0,1),(0,2),(0,3),(0,4)]
+            for col in range(5): g.setColumnStretch(col, 1)
+
+        for k, (r, c) in zip(kartlar, pozlar):
+            g.addWidget(k, r, c)
 
     def kpi_guncelle(self):
         ozet = db.genel_ozet()
@@ -132,6 +217,7 @@ class AnaPencere(QMainWindow):
     def _tab_gider(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20)
         kart, lay = form_kart('Yeni Gider Kaydı  —  (*) zorunlu alanlar')
+        kart.setMaximumWidth(int(self._ekran_w * 0.6))
 
         self.g_tarih = tarih_input()
         self.g_kat   = combo(); self._kategori_doldur(self.g_kat, 'Gider')
@@ -196,6 +282,7 @@ class AnaPencere(QMainWindow):
     def _tab_gelir(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20)
         kart, lay = form_kart('Yeni Gelir Kaydı  —  (*) zorunlu alanlar')
+        kart.setMaximumWidth(int(self._ekran_w * 0.6))
 
         self.gl_tarih   = tarih_input()
         self.gl_kat     = combo(); self._kategori_doldur(self.gl_kat, 'Gelir')
@@ -259,6 +346,7 @@ class AnaPencere(QMainWindow):
     def _tab_kasa(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20)
         kart, lay = form_kart('Kasaya Para Girişi  —  Sermaye, tahsilat, dış kaynak')
+        kart.setMaximumWidth(int(self._ekran_w * 0.6))
 
         self.k_tarih  = tarih_input()
         self.k_tur    = combo(); self._kategori_doldur(self.k_tur, 'Kasa Giriş')
@@ -318,6 +406,7 @@ class AnaPencere(QMainWindow):
     def _tab_kalemler(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20); ana.setSpacing(14)
         kart, lay = form_kart('Yeni Kalem Ekle')
+        kart.setMaximumWidth(int(self._ekran_w * 0.6))
 
         self.kt_tur = combo()
         for t in ['Gider','Gelir','Kasa Giriş']: self.kt_tur.addItem(t)
