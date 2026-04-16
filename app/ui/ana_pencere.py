@@ -269,6 +269,7 @@ class AnaPencere(QMainWindow):
             'odeme': odeme, 'belge': self.g_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
+        QTimer.singleShot(300, self._filtre_kisi_guncelle)
         self.status.showMessage(f'✅ Gider kaydedildi: {no}', 4000)
         self._gider_temizle()
 
@@ -333,6 +334,7 @@ class AnaPencere(QMainWindow):
             'odeme': tahsilat, 'belge': self.gl_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
+        QTimer.singleShot(300, self._filtre_kisi_guncelle)
         self.status.showMessage(f'✅ Gelir kaydedildi: {no}', 4000)
         self._gelir_temizle()
 
@@ -394,6 +396,7 @@ class AnaPencere(QMainWindow):
             'odeme': 'Nakit', 'belge': self.k_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
+        QTimer.singleShot(300, self._filtre_kisi_guncelle)
         self.status.showMessage(f'✅ Kasa girişi kaydedildi: {no}', 4000)
         self._kasa_temizle()
 
@@ -514,7 +517,14 @@ class AnaPencere(QMainWindow):
 
         # 2. satır: Kişi + Ödeme türü + Tutar aralığı + Genel arama
         satir2 = QHBoxLayout(); satir2.setSpacing(12)
-        self.f_kisi   = QLineEdit(); self.f_kisi.setPlaceholderText('Kimden / Kime...')
+
+        # Kişi/şirket — yazarak da arama yapılabilsin, mevcut değerler listede çıksın
+        self.f_kisi = QComboBox()
+        self.f_kisi.setEditable(True)
+        self.f_kisi.setInsertPolicy(QComboBox.NoInsert)
+        self.f_kisi.lineEdit().setPlaceholderText('Kimden / Kime...')
+        self.f_kisi.lineEdit().returnPressed.connect(self.hareketler_filtrele)
+
         self.f_odeme  = QComboBox()
         for o in ['Tüm Ödeme Türleri','Nakit','Havale/EFT','Kredi Kartı','Çek','Senet']:
             self.f_odeme.addItem(o)
@@ -602,8 +612,26 @@ class AnaPencere(QMainWindow):
         self.f_kalem.blockSignals(False)
 
     def filtre_dropdownlari_yenile(self):
-        """Kalem ekleme/silme sonrası tüm filtre dropdown'larını yenile"""
+        """Kalem ekleme/silme ve sekme geçişinde tüm filtre dropdown'larını yenile"""
         self._filtre_kategori_guncelle(self.f_tur.currentText())
+        self._filtre_kisi_guncelle()
+
+    def _filtre_kisi_guncelle(self):
+        """Hareketlerdeki mevcut kişi/şirket listesini güncelle, seçimi koru"""
+        onceki = self.f_kisi.currentText().strip()
+        self.f_kisi.blockSignals(True)
+        self.f_kisi.clear()
+        self.f_kisi.addItem('')   # boş = tümü
+        for kisi in db.kisi_listesi():
+            self.f_kisi.addItem(kisi)
+        # Önceki yazıyı koru
+        if onceki:
+            idx = self.f_kisi.findText(onceki)
+            if idx >= 0:
+                self.f_kisi.setCurrentIndex(idx)
+            else:
+                self.f_kisi.setCurrentText(onceki)
+        self.f_kisi.blockSignals(False)
 
     def hareketler_yukle(self, liste=None):
         if liste is None:
@@ -652,7 +680,7 @@ class AnaPencere(QMainWindow):
         tur      = self.f_tur.currentText();      tur      = None if tur      == 'Tümü'              else tur
         ana_kat  = self.f_ana_kat.currentText();  ana_kat  = None if ana_kat  == 'Tüm Kategoriler'   else ana_kat
         kalem    = self.f_kalem.currentText();    kalem    = None if kalem    == 'Tüm Kalemler'       else kalem
-        kisi     = self.f_kisi.text().strip()     or None
+        kisi     = self.f_kisi.currentText().strip() or None
         odeme    = self.f_odeme.currentText();    odeme    = None if odeme    == 'Tüm Ödeme Türleri'  else odeme
         ara      = self.f_ara.text().strip()      or None
         t_min    = self.f_tutar_min.value()       or None
@@ -672,7 +700,7 @@ class AnaPencere(QMainWindow):
         self.f_tur.setCurrentIndex(0)
         self.f_ana_kat.setCurrentIndex(0)
         self.f_kalem.setCurrentIndex(0)
-        self.f_kisi.clear()
+        self.f_kisi.setCurrentIndex(0)
         self.f_odeme.setCurrentIndex(0)
         self.f_tutar_min.setValue(0)
         self.f_tutar_max.setValue(0)

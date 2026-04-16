@@ -164,7 +164,18 @@ def hareket_sil(hid):
         conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
     conn.commit(); conn.close()
 
-def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
+def kisi_listesi():
+    """Hareketlerde daha önce girilmiş benzersiz kişi/şirket isimlerini döndürür"""
+    conn = baglanti()
+    rows = conn.execute("""
+        SELECT DISTINCT kimden_kime FROM hareketler
+        WHERE kimden_kime IS NOT NULL AND kimden_kime != ''
+        ORDER BY kimden_kime
+    """).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+tarih_bas=None, tarih_bit=None, tur=None, ara=None,
                     kalem=None, ana_kategori=None, kimden=None,
                     tutar_min=None, tutar_max=None, odeme_turu=None):
     conn = baglanti()
