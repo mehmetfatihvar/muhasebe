@@ -397,26 +397,59 @@ class AnaPencere(QMainWindow):
     def _tab_hareketler(self):
         w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20); ana.setSpacing(12)
 
-        # Filtre bar
+        # Filtre kartı — 2 satır grid
         filtre = QFrame(); filtre.setObjectName('formKart')
-        fl = QHBoxLayout(filtre); fl.setContentsMargins(16,12,16,12); fl.setSpacing(12)
+        fl = QVBoxLayout(filtre); fl.setContentsMargins(16,14,16,14); fl.setSpacing(10)
 
+        # 1. satır: Tarih + Tür + Ana Kategori
+        satir1 = QHBoxLayout(); satir1.setSpacing(12)
         self.f_bas = tarih_input(); self.f_bas.setDate(QDate(QDate.currentDate().year(),1,1))
         self.f_bit = tarih_input()
         self.f_tur = QComboBox()
         for t in ['Tümü','Gelir','Gider','Kasa Giriş']: self.f_tur.addItem(t)
-        self.f_ara = QLineEdit(); self.f_ara.setPlaceholderText('Kalem, kişi, belge...')
+        self.f_tur.currentTextChanged.connect(self._filtre_kategori_guncelle)
 
-        fl.addWidget(etiket_input('Başlangıç', self.f_bas))
-        fl.addWidget(etiket_input('Bitiş',     self.f_bit))
-        fl.addWidget(etiket_input('Tür',       self.f_tur))
-        fl.addWidget(etiket_input('Ara',       self.f_ara))
+        self.f_ana_kat = QComboBox(); self.f_ana_kat.addItem('Tüm Kategoriler')
+        self.f_ana_kat.currentTextChanged.connect(self._filtre_kalem_guncelle)
 
-        b_filtre = btn('🔍  Filtrele'); b_filtre.clicked.connect(self.hareketler_filtrele)
-        b_temiz  = btn('🔄  Temizle', 'btnTehlike'); b_temiz.clicked.connect(self._hareketler_temizle)
-        b_excel  = btn('📥  CSV Aktar', 'btnYesil'); b_excel.clicked.connect(self.csv_aktar)
+        self.f_kalem = QComboBox(); self.f_kalem.addItem('Tüm Kalemler')
 
-        for b in [b_filtre, b_temiz, b_excel]: fl.addWidget(b)
+        satir1.addWidget(etiket_input('Başlangıç Tarihi', self.f_bas))
+        satir1.addWidget(etiket_input('Bitiş Tarihi',     self.f_bit))
+        satir1.addWidget(etiket_input('İşlem Türü',       self.f_tur))
+        satir1.addWidget(etiket_input('Ana Kategori',     self.f_ana_kat))
+        satir1.addWidget(etiket_input('Kalem',            self.f_kalem))
+
+        # 2. satır: Kişi + Ödeme türü + Tutar aralığı + Genel arama
+        satir2 = QHBoxLayout(); satir2.setSpacing(12)
+        self.f_kisi   = QLineEdit(); self.f_kisi.setPlaceholderText('Kimden / Kime...')
+        self.f_odeme  = QComboBox()
+        for o in ['Tüm Ödeme Türleri','Nakit','Havale/EFT','Kredi Kartı','Çek','Senet']:
+            self.f_odeme.addItem(o)
+        self.f_tutar_min = QDoubleSpinBox(); self.f_tutar_min.setRange(0,999999999)
+        self.f_tutar_min.setPrefix('₺ '); self.f_tutar_min.setDecimals(0)
+        self.f_tutar_max = QDoubleSpinBox(); self.f_tutar_max.setRange(0,999999999)
+        self.f_tutar_max.setPrefix('₺ '); self.f_tutar_max.setDecimals(0)
+        self.f_ara = QLineEdit(); self.f_ara.setPlaceholderText('Belge no, açıklama, işlem no...')
+        self.f_ara.returnPressed.connect(self.hareketler_filtrele)
+
+        satir2.addWidget(etiket_input('Kişi / Firma',    self.f_kisi))
+        satir2.addWidget(etiket_input('Ödeme Türü',      self.f_odeme))
+        satir2.addWidget(etiket_input('Min Tutar',        self.f_tutar_min))
+        satir2.addWidget(etiket_input('Max Tutar',        self.f_tutar_max))
+        satir2.addWidget(etiket_input('Genel Arama',     self.f_ara))
+
+        # Butonlar
+        btn_row = QHBoxLayout(); btn_row.setSpacing(8)
+        b_filtre = btn('🔍  Filtrele');         b_filtre.clicked.connect(self.hareketler_filtrele)
+        b_temiz  = btn('🔄  Temizle','btnTehlike'); b_temiz.clicked.connect(self._hareketler_temizle)
+        b_excel  = btn('📥  CSV Aktar','btnYesil'); b_excel.clicked.connect(self.csv_aktar)
+        btn_row.addWidget(b_filtre); btn_row.addWidget(b_temiz); btn_row.addWidget(b_excel)
+        btn_row.addStretch()
+
+        fl.addLayout(satir1)
+        fl.addLayout(satir2)
+        fl.addLayout(btn_row)
         ana.addWidget(filtre)
 
         self.h_sayisi = QLabel('Tüm Kayıtlar'); self.h_sayisi.setObjectName('baslik')
@@ -428,6 +461,33 @@ class AnaPencere(QMainWindow):
         self.tbl_hareketler.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         ana.addWidget(self.tbl_hareketler)
         return w
+
+    def _filtre_kategori_guncelle(self, tur_text):
+        """İşlem türü değişince ana kategori dropdown'ını güncelle"""
+        self.f_ana_kat.blockSignals(True)
+        self.f_ana_kat.clear(); self.f_ana_kat.addItem('Tüm Kategoriler')
+        tur = None if tur_text == 'Tümü' else tur_text
+        kalemler = db.kalem_listesi()
+        kategoriler = sorted(set(
+            k['ana_kategori'] for k in kalemler if (tur is None or k['tur'] == tur)
+        ))
+        for k in kategoriler: self.f_ana_kat.addItem(k)
+        self.f_ana_kat.blockSignals(False)
+        self._filtre_kalem_guncelle(self.f_ana_kat.currentText())
+
+    def _filtre_kalem_guncelle(self, ana_text):
+        """Ana kategori değişince kalem dropdown'ını güncelle"""
+        self.f_kalem.clear(); self.f_kalem.addItem('Tüm Kalemler')
+        tur_text = self.f_tur.currentText()
+        tur = None if tur_text == 'Tümü' else tur_text
+        ana = None if ana_text == 'Tüm Kategoriler' else ana_text
+        kalemler = db.kalem_listesi()
+        filtreli = [
+            k['kalem_adi'] for k in kalemler
+            if (tur is None or k['tur'] == tur)
+            and (ana is None or k['ana_kategori'] == ana)
+        ]
+        for k in sorted(set(filtreli)): self.f_kalem.addItem(k)
 
     def hareketler_yukle(self, liste=None):
         if liste is None:
@@ -455,17 +515,36 @@ class AnaPencere(QMainWindow):
             tbl.setCellWidget(row, 14, b_sil)
 
     def hareketler_filtrele(self):
-        bas = self.f_bas.date().toString('yyyy-MM-dd')
-        bit = self.f_bit.date().toString('yyyy-MM-dd')
-        tur = self.f_tur.currentText(); tur = None if tur=='Tümü' else tur
-        ara = self.f_ara.text().strip() or None
-        liste = db.hareket_listesi(bas, bit, tur, ara)
+        bas      = self.f_bas.date().toString('yyyy-MM-dd')
+        bit      = self.f_bit.date().toString('yyyy-MM-dd')
+        tur      = self.f_tur.currentText();      tur      = None if tur      == 'Tümü'              else tur
+        ana_kat  = self.f_ana_kat.currentText();  ana_kat  = None if ana_kat  == 'Tüm Kategoriler'   else ana_kat
+        kalem    = self.f_kalem.currentText();    kalem    = None if kalem    == 'Tüm Kalemler'       else kalem
+        kisi     = self.f_kisi.text().strip()     or None
+        odeme    = self.f_odeme.currentText();    odeme    = None if odeme    == 'Tüm Ödeme Türleri'  else odeme
+        ara      = self.f_ara.text().strip()      or None
+        t_min    = self.f_tutar_min.value()       or None
+        t_max    = self.f_tutar_max.value()       or None
+
+        liste = db.hareket_listesi(
+            tarih_bas=bas, tarih_bit=bit, tur=tur,
+            ana_kategori=ana_kat, kalem=kalem,
+            kimden=kisi, odeme_turu=odeme,
+            tutar_min=t_min, tutar_max=t_max, ara=ara
+        )
         self.hareketler_yukle(liste)
 
     def _hareketler_temizle(self):
         self.f_bas.setDate(QDate(QDate.currentDate().year(),1,1))
         self.f_bit.setDate(QDate.currentDate())
-        self.f_tur.setCurrentIndex(0); self.f_ara.clear()
+        self.f_tur.setCurrentIndex(0)
+        self.f_ana_kat.setCurrentIndex(0)
+        self.f_kalem.setCurrentIndex(0)
+        self.f_kisi.clear()
+        self.f_odeme.setCurrentIndex(0)
+        self.f_tutar_min.setValue(0)
+        self.f_tutar_max.setValue(0)
+        self.f_ara.clear()
         self.hareketler_yukle()
 
     def _hareket_sil(self, hid):
@@ -710,7 +789,9 @@ class AnaPencere(QMainWindow):
         self.kpi_guncelle()
         if idx == 0: self.son_hareketler_yukle()
         elif idx == 4: self.kalemler_yukle()
-        elif idx == 5: self.hareketler_yukle()
+        elif idx == 5:
+            self._filtre_kategori_guncelle(self.f_tur.currentText())
+            self.hareketler_yukle()
         elif idx == 6: self.tablo_filtrele()
         elif idx == 7: self.raporlar_yukle()
 

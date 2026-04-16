@@ -164,16 +164,26 @@ def hareket_sil(hid):
         conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
     conn.commit(); conn.close()
 
-def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None):
+def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
+                    kalem=None, ana_kategori=None, kimden=None,
+                    tutar_min=None, tutar_max=None, odeme_turu=None):
     conn = baglanti()
     q = "SELECT * FROM hareketler WHERE 1=1"
     params = []
-    if tarih_bas: q += " AND tarih >= ?"; params.append(tarih_bas)
-    if tarih_bit: q += " AND tarih <= ?"; params.append(tarih_bit)
-    if tur:       q += " AND tur = ?";    params.append(tur)
+    if tarih_bas:     q += " AND tarih >= ?";              params.append(tarih_bas)
+    if tarih_bit:     q += " AND tarih <= ?";              params.append(tarih_bit)
+    if tur:           q += " AND tur = ?";                 params.append(tur)
+    if ana_kategori:  q += " AND ana_kategori = ?";        params.append(ana_kategori)
+    if kalem:         q += " AND kalem_adi LIKE ?";        params.append(f'%{kalem}%')
+    if kimden:        q += " AND kimden_kime LIKE ?";      params.append(f'%{kimden}%')
+    if odeme_turu:    q += " AND odeme_turu = ?";          params.append(odeme_turu)
+    if tutar_min is not None: q += " AND tutar >= ?";      params.append(tutar_min)
+    if tutar_max is not None: q += " AND tutar <= ?";      params.append(tutar_max)
     if ara:
-        q += " AND (kalem_adi LIKE ? OR kimden_kime LIKE ? OR belge_no LIKE ? OR aciklama LIKE ?)"
-        params += [f'%{ara}%']*4
+        q += """ AND (kalem_adi LIKE ? OR kimden_kime LIKE ?
+                   OR belge_no LIKE ? OR aciklama LIKE ?
+                   OR ana_kategori LIKE ? OR islem_no LIKE ?)"""
+        params += [f'%{ara}%']*6
     q += " ORDER BY id DESC"
     rows = conn.execute(q, params).fetchall()
     conn.close()
