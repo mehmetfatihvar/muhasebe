@@ -1,52 +1,46 @@
 @echo off
 chcp 65001 >nul
 echo.
-echo ╔══════════════════════════════════════════════╗
-echo ║   Muhasebe Sistemi — Windows Build Script   ║
-echo ╚══════════════════════════════════════════════╝
+echo ================================================
+echo    Muhasebe Sistemi - Windows Build Script
+echo ================================================
 echo.
 
-:: ── Gereklilik kontrolü ──────────────────────────────────
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [HATA] Python bulunamadı. https://python.org adresinden yükleyin.
+    echo [HATA] Python bulunamadi. https://python.org adresinden yukleyin.
     pause & exit /b 1
 )
 
-:: ── Bağımlılıkları yükle ─────────────────────────────────
-echo [1/4] Gerekli kütüphaneler yükleniyor...
+echo [1/4] Kutuphaneler yukleniyor...
 pip install PyQt5 pyinstaller pillow --quiet
-if errorlevel 1 ( echo [HATA] Kütüphane yüklenemedi. & pause & exit /b 1 )
+if errorlevel 1 ( echo [HATA] Kutuphane yuklenemedi. & pause & exit /b 1 )
 echo       Tamam.
 
-:: ── Logo dönüştür (varsa) ────────────────────────────────
 echo [2/4] Logo kontrol ediliyor...
 if exist "assets\logo.png" (
     python logo_convert.py assets\logo.png
-    echo       Logo .ico'ya dönüştürüldü.
+    echo       Logo .ico formatina donusturuldu.
 ) else if exist "assets\logo.ico" (
-    echo       Mevcut .ico kullanılıyor.
+    echo       Mevcut .ico kullaniliyor.
 ) else (
-    echo       Logo bulunamadı — varsayılan simge kullanılacak.
-    :: Spec dosyasından icon satırını kaldır
-    powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", \"\" | Set-Content muhasebe.spec"
+    echo       Logo bulunamadi - varsayilan simge kullanilacak.
+    powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", '' | Set-Content muhasebe.spec"
 )
 
-:: ── PyInstaller ile .exe üret ────────────────────────────
-echo [3/4] .exe oluşturuluyor (bu birkaç dakika sürebilir)...
+echo [3/4] .exe olusturuluyor, lutfen bekleyin...
 pyinstaller muhasebe.spec --noconfirm --clean
-if errorlevel 1 ( echo [HATA] Build başarısız. & pause & exit /b 1 )
-echo       dist\MuhasebeSistemi.exe oluşturuldu.
+if errorlevel 1 ( echo [HATA] Build basarisiz. & pause & exit /b 1 )
+echo       dist\MuhasebeSistemi.exe olusturuldu.
 
-:: ── Sonuç ────────────────────────────────────────────────
-echo [4/4] Tamamlandı!
+echo [4/4] Tamamlandi!
 echo.
-echo ┌─────────────────────────────────────────────────┐
-echo │  ✅ dist\MuhasebeSistemi.exe hazır!             │
-echo │                                                  │
-echo │  Sonraki adım (opsiyonel):                       │
-echo │  Inno Setup ile installer.iss dosyasını derle   │
-echo │  → MuhasebeSistemi_Kurulum_v1.0.exe oluşur      │
-echo └─────────────────────────────────────────────────┘
+echo ================================================
+echo   dist\MuhasebeSistemi.exe hazir!
+echo.
+echo   Sonraki adim (opsiyonel):
+echo   Inno Setup ile installer.iss dosyasini derle
+echo   MuhasebeSistemi_Kurulum_v1.0.exe olusur.
+echo ================================================
 echo.
 pause
