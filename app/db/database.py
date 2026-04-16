@@ -271,49 +271,58 @@ def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
     return [dict(r) for r in rows]
 
 # ── RAPORLAR ───────────────────────────────────────────
-def aylik_ozet():
+def aylik_ozet(tarih_bas=None, tarih_bit=None):
     conn = baglanti()
-    rows = conn.execute("""
-        SELECT strftime('%Y-%m', tarih) as ay,
-               SUM(giris) as gelir, SUM(cikis) as gider, COUNT(*) as sayi
-        FROM hareketler GROUP BY ay ORDER BY ay DESC
-    """).fetchall()
+    q = "SELECT strftime('%Y-%m', tarih) as ay, SUM(giris) as gelir, SUM(cikis) as gider, COUNT(*) as sayi FROM hareketler WHERE 1=1"
+    params = []
+    if tarih_bas: q += " AND tarih >= ?"; params.append(tarih_bas)
+    if tarih_bit: q += " AND tarih <= ?"; params.append(tarih_bit)
+    q += " GROUP BY ay ORDER BY ay DESC"
+    rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def kategori_dagilim():
+def kategori_dagilim(tarih_bas=None, tarih_bit=None):
     conn = baglanti()
-    rows = conn.execute("""
-        SELECT tur, ana_kategori, SUM(tutar) as tutar, COUNT(*) as sayi
-        FROM hareketler GROUP BY tur, ana_kategori ORDER BY tutar DESC
-    """).fetchall()
+    q = "SELECT tur, ana_kategori, SUM(tutar) as tutar, COUNT(*) as sayi FROM hareketler WHERE 1=1"
+    params = []
+    if tarih_bas: q += " AND tarih >= ?"; params.append(tarih_bas)
+    if tarih_bit: q += " AND tarih <= ?"; params.append(tarih_bit)
+    q += " GROUP BY tur, ana_kategori ORDER BY tutar DESC"
+    rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def top_kalemler(limit=5):
+def top_kalemler(limit=5, tarih_bas=None, tarih_bit=None):
     conn = baglanti()
-    rows = conn.execute("""
-        SELECT kalem_adi, COUNT(*) as sayi, SUM(tutar) as tutar
-        FROM hareketler GROUP BY kalem_adi ORDER BY sayi DESC LIMIT ?
-    """, (limit,)).fetchall()
+    q = "SELECT kalem_adi, COUNT(*) as sayi, SUM(tutar) as tutar FROM hareketler WHERE 1=1"
+    params = []
+    if tarih_bas: q += " AND tarih >= ?"; params.append(tarih_bas)
+    if tarih_bit: q += " AND tarih <= ?"; params.append(tarih_bit)
+    q += f" GROUP BY kalem_adi ORDER BY sayi DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def genel_ozet():
+def genel_ozet(tarih_bas=None, tarih_bit=None):
     conn = baglanti()
-    r = conn.execute("""
+    q_where = "WHERE 1=1"
+    params = []
+    if tarih_bas: q_where += " AND tarih >= ?"; params.append(tarih_bas)
+    if tarih_bit: q_where += " AND tarih <= ?"; params.append(tarih_bit)
+    r = conn.execute(f"""
         SELECT
             COUNT(*) as toplam_hareket,
             COALESCE(SUM(CASE WHEN tur='Gelir' THEN tutar ELSE 0 END),0) as toplam_gelir,
             COALESCE(SUM(CASE WHEN tur='Gider' THEN tutar ELSE 0 END),0) as toplam_gider,
             COALESCE(SUM(CASE WHEN tur='Kasa Giriş' THEN tutar ELSE 0 END),0) as kasa_giris,
             COALESCE(SUM(giris)-SUM(cikis),0) as bakiye
-        FROM hareketler
-    """).fetchone()
+        FROM hareketler {q_where}
+    """, params).fetchone()
     kalem_sayisi = conn.execute("SELECT COUNT(*) FROM kalemler").fetchone()[0]
     conn.close()
-    d = dict(r)
-    d['kalem_sayisi'] = kalem_sayisi
+    d = dict(r); d['kalem_sayisi'] = kalem_sayisi
     return d
 
 # ── YEDEKLEME ──────────────────────────────────────────
