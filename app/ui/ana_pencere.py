@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView,
     QPushButton, QComboBox, QLineEdit, QDateEdit, QTextEdit,
     QMessageBox, QFileDialog, QFrame, QGridLayout, QSizePolicy,
-    QScrollArea, QStatusBar, QDoubleSpinBox, QSplitter, QApplication
+    QScrollArea, QStatusBar, QDoubleSpinBox, QSplitter, QApplication,
+    QDialog, QDialogButtonBox
 )
 from PyQt5.QtCore import Qt, QDate, QTimer
 from PyQt5.QtGui import QFont, QColor
@@ -617,7 +618,7 @@ class AnaPencere(QMainWindow):
         ana.addWidget(self.h_sayisi)
 
         sutunlar = ['İşlem No','Tarih','Tür','Kategori','Kalem','Açıklama',
-                    'Tutar','Giriş','Çıkış','Kimden/Kime','Ödeme','Belge','Bakiye','Durum','']
+                    'Tutar','Giriş','Çıkış','Kimden/Kime','Ödeme','Belge','Bakiye','','']
         self.tbl_hareketler = self._tablo(sutunlar)
         self.tbl_hareketler.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         ana.addWidget(self.tbl_hareketler)
@@ -698,7 +699,6 @@ class AnaPencere(QMainWindow):
         tbl = self.tbl_hareketler
         self.h_sayisi.setText(f'{len(liste)} Kayıt')
 
-        # UI güncellemelerini dondur — toplu yazım çok daha hızlı
         tbl.setUpdatesEnabled(False)
         tbl.setSortingEnabled(False)
         tbl.clearContents()
@@ -724,14 +724,177 @@ class AnaPencere(QMainWindow):
                     item.setForeground(renk[v])
                 if c in (6, 7, 8, 12):
                     item.setTextAlignment(sag)
+                # ID'yi gizli veri olarak sakla
+                if c == 0:
+                    item.setData(Qt.UserRole, h['id'])
                 tbl.setItem(row, c, item)
 
-            b_sil = QPushButton('🗑️'); b_sil.setObjectName('btnSil')
+            # Düzenle butonu
+            b_duzenle = QPushButton('✏️'); b_duzenle.setObjectName('btnSil')
+            b_duzenle.setToolTip('Düzenle')
             hid = h['id']
+            b_duzenle.clicked.connect(lambda _, i=hid: self._hareket_duzenle(i))
+            tbl.setCellWidget(row, 13, b_duzenle)
+
+            b_sil = QPushButton('🗑️'); b_sil.setObjectName('btnSil')
+            b_sil.setToolTip('Sil')
             b_sil.clicked.connect(lambda _, i=hid: self._hareket_sil(i))
             tbl.setCellWidget(row, 14, b_sil)
 
         tbl.setUpdatesEnabled(True)
+
+        # Çift tıkla düzenle
+        try: tbl.doubleClicked.disconnect()
+        except: pass
+        tbl.doubleClicked.connect(self._tablo_cift_tiklandi)
+
+    def _tablo_cift_tiklandi(self, index):
+        item = self.tbl_hareketler.item(index.row(), 0)
+        if item:
+            hid = item.data(Qt.UserRole)
+            if hid:
+                self._hareket_duzenle(hid)
+
+    def _hareket_duzenle(self, hid):
+        h = db.hareket_getir(hid)
+        if not h:
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f'Hareketi Düzenle — {h["islem_no"]}')
+        dialog.setMinimumWidth(560)
+        dialog.setStyleSheet(STYLESHEET)
+
+        ana = QVBoxLayout(dialog)
+        ana.setContentsMargins(20, 16, 20, 16)
+        ana.setSpacing(14)
+
+        baslik = QLabel(f'📝  {h["islem_no"]} — Düzenle')
+        baslik.setObjectName('baslik')
+        ana.addWidget(baslik)
+
+        grid = QGridLayout(); grid.setSpacing(12)
+
+        # Tarih
+        d_tarih = tarih_input()
+        try:
+            d_tarih.setDate(QDate.fromString(h['tarih'], 'yyyy-MM-dd'))
+        except:
+            d_tarih.setDate(QDate.currentDate())
+
+        # Tür
+        d_tur = QComboBox()
+        for t in ['Gider','Gelir','Kasa Giriş']: d_tur.addItem(t)
+        d_tur.setCurrentText(h.get('tur','Gider'))
+
+        # Ana kategori
+        d_ana = QComboBox(); d_ana.setEditable(True)
+        kalemler = db.kalem_listesi()
+        analar = sorted(set(k['ana_kategori'] for k in kalemler))
+        d_ana.addItems(analar)
+        d_ana.setCurrentText(h.get('ana_kategori',''))
+
+        # Kalem
+        d_kalem = QComboBox(); d_kalem.setEditable(True)
+        kalem_adlari = sorted(set(k['kalem_adi'] for k in kalemler))
+        d_kalem.addItems(kalem_adlari)
+        d_kalem.setCurrentText(h.get('kalem_adi',''))
+
+        # Tür değişince kategori listesini güncelle
+        def tur_degisti(tur_text):
+            d_ana.blockSignals(True)
+            onceki_ana = d_ana.currentText()
+            d_ana.clear()
+            filtreli = sorted(set(k['ana_kategori'] for k in kalemler if k['tur']==tur_text))
+            d_ana.addItems(filtreli if filtreli else analar)
+            d_ana.setCurrentText(onceki_ana)
+            d_ana.blockSignals(False)
+            ana_degisti(d_ana.currentText())
+
+        def ana_degisti(ana_text):
+            tur_text = d_tur.currentText()
+            onceki = d_kalem.currentText()
+            d_kalem.clear()
+            filtreli = sorted(set(
+                k['kalem_adi'] for k in kalemler
+                if k['tur']==tur_text and k['ana_kategori']==ana_text
+            ))
+            d_kalem.addItems(filtreli if filtreli else kalem_adlari)
+            idx = d_kalem.findText(onceki)
+            if idx >= 0: d_kalem.setCurrentIndex(idx)
+
+        d_tur.currentTextChanged.connect(tur_degisti)
+        d_ana.currentTextChanged.connect(ana_degisti)
+        tur_degisti(d_tur.currentText())
+
+        # Tutar
+        d_tutar = tutar_input()
+        d_tutar.setValue(float(h.get('tutar', 0)))
+
+        # Ödeme türü
+        d_odeme = QComboBox()
+        for o in ['Nakit','Havale/EFT','Kredi Kartı','Çek','Senet']:
+            d_odeme.addItem(o)
+        d_odeme.setCurrentText(h.get('odeme_turu','Nakit'))
+
+        # Kişi
+        d_kisi = QComboBox(); d_kisi.setEditable(True)
+        d_kisi.addItem('')
+        for k in db.kisi_listesi(): d_kisi.addItem(k)
+        d_kisi.setCurrentText(h.get('kimden_kime',''))
+
+        # Belge
+        d_belge = QLineEdit(h.get('belge_no',''))
+
+        # Açıklama
+        d_aciklama = QTextEdit(h.get('aciklama',''))
+        d_aciklama.setMaximumHeight(70)
+
+        grid.addWidget(etiket_input('Tarih *',       d_tarih),    0, 0)
+        grid.addWidget(etiket_input('İşlem Türü *',  d_tur),      0, 1)
+        grid.addWidget(etiket_input('Ana Kategori',  d_ana),      1, 0)
+        grid.addWidget(etiket_input('Kalem',         d_kalem),    1, 1)
+        grid.addWidget(etiket_input('Tutar *',       d_tutar),    2, 0)
+        grid.addWidget(etiket_input('Ödeme Türü',    d_odeme),    2, 1)
+        grid.addWidget(etiket_input('Kişi / Firma',  d_kisi),     3, 0)
+        grid.addWidget(etiket_input('Belge No',      d_belge),    3, 1)
+        grid.addWidget(etiket_input('Açıklama',      d_aciklama), 4, 0, 1, 2)
+        ana.addLayout(grid)
+
+        # Butonlar
+        bb = QDialogButtonBox()
+        b_kaydet = bb.addButton('💾  Kaydet', QDialogButtonBox.AcceptRole)
+        b_kaydet.setStyleSheet('background:#3d7fff; color:#fff; font-weight:700; padding:8px 20px;')
+        b_iptal  = bb.addButton('İptal',      QDialogButtonBox.RejectRole)
+        b_iptal.setObjectName('btnTehlike')
+        bb.accepted.connect(dialog.accept)
+        bb.rejected.connect(dialog.reject)
+        ana.addWidget(bb)
+
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        kalemler_db = db.kalem_listesi()
+        secili_kalem = d_kalem.currentText()
+        alt = next((k['alt_kategori'] for k in kalemler_db if k['kalem_adi']==secili_kalem), '')
+
+        db.hareket_guncelle(hid, {
+            'tarih':  d_tarih.date().toString('yyyy-MM-dd'),
+            'tur':    d_tur.currentText(),
+            'ana':    d_ana.currentText(),
+            'alt':    alt,
+            'kalem':  secili_kalem,
+            'tutar':  d_tutar.value(),
+            'odeme':  d_odeme.currentText(),
+            'kimden': d_kisi.currentText().strip(),
+            'belge':  d_belge.text().strip(),
+            'aciklama': d_aciklama.toPlainText().strip(),
+        })
+
+        self.kpi_guncelle()
+        self.son_hareketler_yukle()
+        self.hareketler_yukle()
+        self.status.showMessage(f'✅ Hareket güncellendi: {h["islem_no"]}', 4000)
 
     def hareketler_filtrele(self):
         bas      = self.f_bas.date().toString('yyyy-MM-dd')

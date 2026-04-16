@@ -191,7 +191,50 @@ def hareket_sil(hid):
         conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
     conn.commit(); conn.close()
 
-def kisi_listesi():
+def hareket_guncelle(hid, veri: dict):
+    tur = veri['tur']
+    tutar = float(veri['tutar'])
+    giris = tutar if tur in ('Gelir', 'Kasa Giriş') else 0
+    cikis = tutar if tur == 'Gider' else 0
+
+    tarih_ham = veri['tarih']
+    try:
+        if '.' in tarih_ham:
+            tarih_db = datetime.strptime(tarih_ham, '%d.%m.%Y').strftime('%Y-%m-%d')
+        else:
+            tarih_db = tarih_ham
+    except ValueError:
+        tarih_db = tarih_ham
+
+    conn = baglanti()
+    conn.execute("""
+        UPDATE hareketler SET
+            tarih=?, tur=?, ana_kategori=?, alt_kategori=?, kalem_adi=?,
+            aciklama=?, tutar=?, giris=?, cikis=?,
+            kimden_kime=?, odeme_turu=?, belge_no=?
+        WHERE id=?
+    """, (
+        tarih_db, tur,
+        veri.get('ana',''), veri.get('alt',''), veri.get('kalem',''),
+        veri.get('aciklama',''), tutar, giris, cikis,
+        veri.get('kimden',''), veri.get('odeme',''), veri.get('belge',''),
+        hid
+    ))
+    # Tüm bakiyeleri yeniden hesapla
+    rows = conn.execute("SELECT id,giris,cikis FROM hareketler ORDER BY tarih,id").fetchall()
+    bak = 0
+    for r in rows:
+        bak += r['giris'] - r['cikis']
+        conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
+    conn.commit(); conn.close()
+
+def hareket_getir(hid):
+    conn = baglanti()
+    row = conn.execute("SELECT * FROM hareketler WHERE id=?", (hid,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
     """Hareketlerde daha önce girilmiş benzersiz kişi/şirket isimlerini döndürür"""
     conn = baglanti()
     rows = conn.execute("""
