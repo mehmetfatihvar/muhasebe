@@ -1,9 +1,25 @@
 import sqlite3
 import json
 import os
+import sys
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'muhasebe.db')
+
+def _uygulama_klasoru():
+    """
+    .exe olarak çalışıyorsa: exe'nin bulunduğu klasör (kalıcı)
+    .py olarak çalışıyorsa : projenin kök klasörü
+    Bu sayede DB daima .exe'nin yanına yazılır, geçici klasöre değil.
+    """
+    if getattr(sys, 'frozen', False):
+        # PyInstaller ile derlenmis .exe
+        return os.path.dirname(sys.executable)
+    else:
+        # Kaynak koddan calistirma — proje koku
+        return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+DB_PATH = os.path.join(_uygulama_klasoru(), 'muhasebe.db')
 
 def baglanti():
     conn = sqlite3.connect(DB_PATH)
