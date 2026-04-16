@@ -29,8 +29,13 @@ if exist "assets\logo.png" (
 )
 
 echo [3/4] .exe olusturuluyor, lutfen bekleyin...
-pyinstaller muhasebe.spec --noconfirm --clean
-if errorlevel 1 ( echo [HATA] Build basarisiz. & pause & exit /b 1 )
+
+:: pyinstaller PATH'te olmayabilir, python -m ile cagir
+python -m PyInstaller muhasebe.spec --noconfirm --clean
+if errorlevel 1 (
+    echo [HATA] Build basarisiz.
+    pause & exit /b 1
+)
 echo       dist\MuhasebeSistemi.exe olusturuldu.
 
 echo [4/4] Tamamlandi!
