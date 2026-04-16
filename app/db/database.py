@@ -137,6 +137,17 @@ def hareket_ekle(veri: dict):
     giris = tutar if tur in ('Gelir','Kasa Giriş') else 0
     cikis = tutar if tur == 'Gider' else 0
     bakiye = mevcut_bakiye() + giris - cikis
+
+    # Tarihi her zaman yyyy-MM-dd formatında sakla
+    tarih_ham = veri['tarih']
+    try:
+        if '.' in tarih_ham:  # dd.MM.yyyy → yyyy-MM-dd
+            tarih_db = datetime.strptime(tarih_ham, '%d.%m.%Y').strftime('%Y-%m-%d')
+        else:
+            tarih_db = tarih_ham  # zaten yyyy-MM-dd
+    except ValueError:
+        tarih_db = tarih_ham
+
     conn = baglanti()
     conn.execute("""
         INSERT INTO hareketler
@@ -144,7 +155,7 @@ def hareket_ekle(veri: dict):
          tutar,giris,cikis,kimden_kime,odeme_turu,belge_no,bakiye,kayit_tarihi)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        no, veri['tarih'], tur,
+        no, tarih_db, tur,
         veri.get('ana',''), veri.get('alt',''), veri.get('kalem',''),
         veri.get('aciklama',''), tutar, giris, cikis,
         veri.get('kimden',''), veri.get('odeme',''), veri.get('belge',''),
@@ -195,7 +206,7 @@ def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
                    OR belge_no LIKE ? OR aciklama LIKE ?
                    OR ana_kategori LIKE ? OR islem_no LIKE ?)"""
         params += [f'%{ara}%']*6
-    q += " ORDER BY id DESC"
+    q += " ORDER BY tarih DESC, id DESC"
     rows = conn.execute(q, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]

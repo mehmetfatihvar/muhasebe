@@ -11,7 +11,7 @@ from datetime import datetime, date
 import sys, os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from app.ui.widgets import (para_format, kpi_kart, form_kart,
+from app.ui.widgets import (para_format, tarih_format, kpi_kart, form_kart,
                              etiket_input, combo, tarih_input,
                              tutar_input, btn, ayrac)
 from app.ui.style import STYLESHEET
@@ -709,7 +709,7 @@ class AnaPencere(QMainWindow):
 
         for row, h in enumerate(liste):
             vals = [
-                h['islem_no'], h['tarih'], h['tur'], h['ana_kategori'],
+                h['islem_no'], tarih_format(h['tarih']), h['tur'], h['ana_kategori'],
                 h['kalem_adi'], h.get('aciklama',''),
                 para_format(h['tutar']),
                 para_format(h['giris']) if h['giris'] else '-',
@@ -848,11 +848,14 @@ class AnaPencere(QMainWindow):
         ort = (top_gelir + top_gider) / len(liste) if liste else 0
         self.t_ort_v.setText(para_format(ort))
 
-        tbl = self.tbl_tablo; tbl.setRowCount(0)
-        renk = {'Gelir':'#2eca8b','Gider':'#ff4d6d','Kasa Giriş':'#5b9aff'}
-        for h in liste:
-            row = tbl.rowCount(); tbl.insertRow(row)
-            vals = [h['islem_no'], h['tarih'], h['tur'], h['ana_kategori'],
+        tbl = self.tbl_tablo
+        tbl.setUpdatesEnabled(False)
+        tbl.clearContents()
+        tbl.setRowCount(len(liste))
+        renk = {'Gelir':QColor('#2eca8b'),'Gider':QColor('#ff4d6d'),'Kasa Giriş':QColor('#5b9aff')}
+        sag = Qt.AlignRight | Qt.AlignVCenter
+        for row, h in enumerate(liste):
+            vals = [h['islem_no'], tarih_format(h['tarih']), h['tur'], h['ana_kategori'],
                     h['kalem_adi'], h.get('aciklama',''),
                     para_format(h['tutar']),
                     para_format(h['giris']) if h['giris'] else '-',
@@ -860,10 +863,12 @@ class AnaPencere(QMainWindow):
                     h.get('kimden_kime',''), h.get('odeme_turu',''),
                     h.get('belge_no',''), para_format(h['bakiye']), h.get('durum','✅')]
             for c, v in enumerate(vals):
-                item = QTableWidgetItem(str(v)); item.setFlags(Qt.ItemIsEnabled)
-                if c == 2: item.setForeground(QColor(renk.get(v,'#e8ecf4')))
-                if c in (6,7,8,12): item.setTextAlignment(Qt.AlignRight|Qt.AlignVCenter)
+                item = QTableWidgetItem(str(v))
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                if c == 2 and v in renk: item.setForeground(renk[v])
+                if c in (6,7,8,12): item.setTextAlignment(sag)
                 tbl.setItem(row, c, item)
+        tbl.setUpdatesEnabled(True)
 
     def _tablo_temizle(self):
         self.t_bas.setDate(QDate(QDate.currentDate().year(),1,1))
@@ -976,18 +981,25 @@ class AnaPencere(QMainWindow):
         return tbl
 
     def _tablo_doldur(self, tbl, rows, alanlar):
-        tbl.setRowCount(0)
-        renk_map = {'Gelir':'#2eca8b','Gider':'#ff4d6d','Kasa Giriş':'#5b9aff'}
+        tbl.setUpdatesEnabled(False)
+        tbl.clearContents()
+        tbl.setRowCount(len(rows))
+        renk_map = {'Gelir':QColor('#2eca8b'),'Gider':QColor('#ff4d6d'),'Kasa Giriş':QColor('#5b9aff')}
         para_alanlar = {'tutar','giris','cikis','bakiye'}
-        for h in rows:
-            row = tbl.rowCount(); tbl.insertRow(row)
+        sag = Qt.AlignRight | Qt.AlignVCenter
+        for row, h in enumerate(rows):
             for c, alan in enumerate(alanlar):
                 v = h.get(alan, '')
-                if alan in para_alanlar: v = para_format(v) if v else '-'
-                item = QTableWidgetItem(str(v)); item.setFlags(Qt.ItemIsEnabled)
-                if alan == 'tur': item.setForeground(QColor(renk_map.get(str(v),'#e8ecf4')))
-                if alan in para_alanlar: item.setTextAlignment(Qt.AlignRight|Qt.AlignVCenter)
+                if alan in para_alanlar:
+                    v = para_format(v) if v else '-'
+                elif alan == 'tarih':
+                    v = tarih_format(str(v))
+                item = QTableWidgetItem(str(v))
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                if alan == 'tur': item.setForeground(renk_map.get(str(v), QColor('#e8ecf4')))
+                if alan in para_alanlar: item.setTextAlignment(sag)
                 tbl.setItem(row, c, item)
+        tbl.setUpdatesEnabled(True)
 
     def _kategori_doldur(self, combo_widget, tur):
         combo_widget.clear(); combo_widget.addItem('-- Seçiniz --')

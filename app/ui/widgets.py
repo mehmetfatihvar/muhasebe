@@ -9,6 +9,17 @@ def para_format(tutar):
     return f"₺{tutar:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def tarih_format(tarih_str):
+    """yyyy-MM-dd → dd.MM.yyyy — DB'deki formatı gösterim formatına çevirir"""
+    if not tarih_str:
+        return '-'
+    try:
+        from datetime import datetime
+        return datetime.strptime(tarih_str, '%Y-%m-%d').strftime('%d.%m.%Y')
+    except ValueError:
+        return tarih_str  # zaten başka formattaysa olduğu gibi döndür
+
+
 def kpi_kart(label, deger, renk='#e8ecf4'):
     kart = QFrame(); kart.setObjectName('kpiKart')
     kart.setMinimumHeight(90)
