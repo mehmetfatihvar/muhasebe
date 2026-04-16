@@ -175,7 +175,7 @@ def kisi_listesi():
     conn.close()
     return [r[0] for r in rows]
 
-tarih_bas=None, tarih_bit=None, tur=None, ara=None,
+def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
                     kalem=None, ana_kategori=None, kimden=None,
                     tutar_min=None, tutar_max=None, odeme_turu=None):
     conn = baglanti()

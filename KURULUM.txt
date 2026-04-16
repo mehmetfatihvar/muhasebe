@@ -1,0 +1,95 @@
+# KURULUM REHBERİ — Muhasebe Sistemi
+
+## YÖNTEM 1: Hazır .exe ile (En Kolay)
+
+Eğer `dist\MuhasebeSistemi.exe` dosyası varsa:
+- Direkt çift tıklayın, kurulum gerekmez.
+- Veritabanı ilk açılışta otomatik oluşur.
+
+---
+
+## YÖNTEM 2: Kaynak koddan çalıştırma
+
+### Adım 1 — Python kur
+
+https://www.python.org/downloads/ adresinden Python 3.10 veya üstünü indirin.
+
+KURULUM SIRASINDA MUTLAKA:
+  [x] "Add Python to PATH" kutucugunu isareti koyun
+
+Kontrol: Komut istemi (cmd) acin, yazin:
+  python --version
+  Cikti: Python 3.x.x  goruyorsaniz tamam.
+
+### Adım 2 — Repoyu indirin
+
+Secenek A — Git ile:
+  git clone https://github.com/mehmetfatihvar/muhasebe.git
+  cd muhasebe
+
+Secenek B — ZIP ile:
+  GitHub sayfasinda yesil "Code" butonuna basin
+  "Download ZIP" secin, indirilen zip'i acin
+
+### Adım 3 — Gerekli kütüphaneyi kurun
+
+Komut istemi'nde proje klasorune girin:
+  cd C:\...\muhasebe
+
+Sonra:
+  pip install PyQt5
+
+### Adım 4 — Calistirin
+
+  python main.py
+
+---
+
+## YÖNTEM 3: .exe olusturun (baska bilgisayara tasimak icin)
+
+Proje klasorunde:
+  build_windows.bat
+
+Olustuktan sonra dist\MuhasebeSistemi.exe dosyasini
+istediginiz bilgisayara kopyalayin. O bilgisayarda Python gerekmez.
+
+---
+
+## SISTEM GEREKSINİMLERİ
+
+  isletim Sistemi : Windows 10 veya Windows 11 (64-bit)
+  Python          : 3.10 veya uzeri (kaynak koddan calistirma icin)
+  RAM             : En az 512 MB
+  Disk            : En az 200 MB (Python + PyQt5 dahil)
+  Ekran           : En az 1024x768
+
+---
+
+## SIKÇA KARŞILAŞILAN SORUNLAR
+
+SORUN: 'python' is not recognized...
+COZUM: Python kurulumunda "Add to PATH" secmediniz.
+       Python'u kaldirip tekrar kurun, bu sefer kutucugu isaretleyin.
+
+SORUN: 'pip' is not recognized...
+COZUM: python -m pip install PyQt5
+
+SORUN: Uygulama aciliyor kapaniyor (hata gostermiyor)
+COZUM: Komut istemi ile acin:
+       cd C:\...\muhasebe
+       python main.py
+       Hata mesajini gorun.
+
+SORUN: SyntaxError veya ModuleNotFoundError
+COZUM: GitHub'dan en son suruму indirin (git pull veya ZIP)
+       Sonra: pip install PyQt5 --upgrade
+
+---
+
+## VERI YEDEKLEME
+
+Verileriniz muhasebe.db dosyasinda saklanir.
+Bu dosyayi duzenli olarak kopyalayin.
+
+Uygulama icinden: Ust barda "Yedekle" butonu -> JSON yedek alinir.
+Geri yukleme    : "Yedek Yukle" butonu -> JSON dosyasini secin.
