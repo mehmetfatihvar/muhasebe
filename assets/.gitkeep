@@ -1,0 +1,3 @@
+# Bu dosya assets/ klasörünün GitHub'da görünmesi için gereklidir.
+# Logonuzu (logo.png veya logo.svg) bu klasöre ekleyin.
+# Ardından: python logo_convert.py assets/logo.png
