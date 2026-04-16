@@ -1,7 +1,6 @@
 @echo off
 setlocal
 
-:: Turkce karakter sorunu olmadan calistir
 chcp 65001 > nul 2>&1
 
 echo.
@@ -10,7 +9,6 @@ echo    Muhasebe Sistemi - Windows Build Script
 echo ================================================
 echo.
 
-:: Python kontrolu
 python --version > nul 2>&1
 if %errorlevel% neq 0 (
     echo [HATA] Python bulunamadi.
@@ -21,7 +19,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [1/4] Kutuphaneler yukleniyor...
-python -m pip install PyQt5 pyinstaller pillow --quiet --no-warn-script-location
+pip install PyQt5 pyinstaller pillow --quiet --no-warn-script-location
 if %errorlevel% neq 0 (
     echo [HATA] Kutuphane yuklenemedi.
     pause
@@ -31,25 +29,25 @@ echo       Tamam.
 
 echo [2/4] Logo kontrol ediliyor...
 if exist "assets\logo.svg" (
-    echo       SVG logo bulundu...
-    python -m pip install cairosvg --quiet --no-warn-script-location
+    echo       SVG logo bulundu, ICO donusturuluyor...
+    pip install cairosvg --quiet --no-warn-script-location
     python logo_convert.py assets\logo.svg --cikti assets\logo.ico
-    if %errorlevel% neq 0 ( echo [HATA] Logo donusturulemedi. & pause & exit /b 1 )
+    if %errorlevel% neq 0 ( echo [HATA] SVG donusturulemedi. & pause & exit /b 1 )
     echo       Logo hazir.
 ) else if exist "assets\logo.png" (
-    echo       PNG logo bulundu...
+    echo       PNG logo bulundu, ICO donusturuluyor...
     python logo_convert.py assets\logo.png --cikti assets\logo.ico
-    if %errorlevel% neq 0 ( echo [HATA] Logo donusturulemedi. & pause & exit /b 1 )
+    if %errorlevel% neq 0 ( echo [HATA] PNG donusturulemedi. & pause & exit /b 1 )
     echo       Logo hazir.
 ) else if exist "assets\logo.jpg" (
-    echo       JPG logo bulundu...
+    echo       JPG logo bulundu, ICO donusturuluyor...
     python logo_convert.py assets\logo.jpg --cikti assets\logo.ico
-    if %errorlevel% neq 0 ( echo [HATA] Logo donusturulemedi. & pause & exit /b 1 )
+    if %errorlevel% neq 0 ( echo [HATA] JPG donusturulemedi. & pause & exit /b 1 )
     echo       Logo hazir.
 ) else if exist "assets\logo.ico" (
     echo       Hazir ICO kullaniliyor.
 ) else (
-    echo       Logo bulunamadi, varsayilan simge kullanilacak.
+    echo       Logo bulunamadi - varsayilan simge kullanilacak.
     powershell -Command "(Get-Content muhasebe.spec) -replace \"icon='assets/logo.ico',\", \"icon=None,\" | Set-Content muhasebe.spec"
 )
 
@@ -57,7 +55,14 @@ echo [3/4] .exe olusturuluyor, lutfen bekleyin...
 python -m PyInstaller muhasebe.spec --noconfirm --clean
 if %errorlevel% equ 0 goto basarili
 
-echo [HATA] Build basarisiz oldu.
+for /f "delims=" %%i in ('python -c "import sys,os; print(os.path.join(os.path.dirname(sys.executable), 'Scripts', 'pyinstaller.exe'))"') do set PYINST=%%i
+if exist "%PYINST%" (
+    "%PYINST%" muhasebe.spec --noconfirm --clean
+    if %errorlevel% equ 0 goto basarili
+)
+
+echo [HATA] PyInstaller bulunamadi!
+echo Lutfen: pip install pyinstaller --force-reinstall
 pause
 exit /b 1
 
@@ -75,9 +80,9 @@ echo.
 echo ================================================
 echo   dist\MuhasebeSistemi.exe hazir!
 echo.
-echo   Inno Setup ile installer.iss dosyasini derleyerek
-echo   profesyonel kurulum paketi olusturabilirsiniz.
+echo   Sonraki adim (opsiyonel):
+echo   Inno Setup ile installer.iss dosyasini derle
+echo   MuhasebeSistemi_Kurulum_v1.0.exe olusur.
 echo ================================================
 echo.
 pause
-endlocal
