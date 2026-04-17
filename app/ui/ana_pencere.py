@@ -73,6 +73,7 @@ class AnaPencere(QMainWindow):
         self.tabs.addTab(self._tab_hareketler(),  '🗂  Tüm Hareketler')
         self.tabs.addTab(self._tab_tablo(),       '📊  Gelir/Gider Tablosu')
         self.tabs.addTab(self._tab_raporlar(),    '📈  Raporlar')
+        self.tabs.addTab(self._tab_donem_raporu(),'📄  Dönem Raporu')
 
         self.tabs.currentChanged.connect(self._tab_degisti)
         self._h_liste = []   # sayfalama için liste cache
@@ -1192,6 +1193,185 @@ class AnaPencere(QMainWindow):
             v = QLabel(val); v.setAlignment(Qt.AlignRight)
             v.setStyleSheet(f'color:{renk_str}; font-weight:700;')
             satir.addWidget(v); lay.addLayout(satir)
+
+    # ─────────────────────────── DÖNEM RAPORU ──────────────────────────
+    def _tab_donem_raporu(self):
+        w = QWidget(); ana = QVBoxLayout(w); ana.setContentsMargins(20,16,20,20); ana.setSpacing(16)
+
+        ana.addWidget(QLabel('📄  Dönem Kapanış Raporu', objectName='baslik'))
+
+        # Dönem seçim kartı
+        kart, lay = form_kart('Dönem Seçimi')
+        kart.setMaximumWidth(720)
+
+        # Hızlı ay seçimi
+        ay_baslik = QLabel('HAZIR DÖNEMLER'); ay_baslik.setObjectName('etiket')
+        lay.addWidget(ay_baslik)
+
+        ay_row = QHBoxLayout(); ay_row.setSpacing(8)
+        bugun = QDate.currentDate()
+
+        def ay_sec(yil, ay):
+            bas = QDate(yil, ay, 1)
+            bit = QDate(yil, ay, bas.daysInMonth())
+            self.dr_bas.setDate(bas); self.dr_bit.setDate(bit)
+
+        for ay_no, ay_ad in enumerate(['Oca','Şub','Mar','Nis','May','Haz',
+                                        'Tem','Ağu','Eyl','Eki','Kas','Ara'], 1):
+            b = QPushButton(ay_ad); b.setObjectName('btnTehlike')
+            b.setFixedWidth(46); b.setFixedHeight(30)
+            b.clicked.connect(lambda _, a=ay_no: ay_sec(bugun.year(), a))
+            ay_row.addWidget(b)
+        ay_row.addStretch()
+        lay.addLayout(ay_row)
+
+        # Yıl butonu
+        yil_row = QHBoxLayout(); yil_row.setSpacing(8)
+        for yil in range(bugun.year() - 2, bugun.year() + 1):
+            b = QPushButton(str(yil)); b.setObjectName('btnTehlike')
+            b.setFixedWidth(70); b.setFixedHeight(30)
+            b.clicked.connect(lambda _, y=yil: (
+                self.dr_bas.setDate(QDate(y, 1, 1)),
+                self.dr_bit.setDate(QDate(y, 12, 31))
+            ))
+            yil_row.addWidget(b)
+        yil_row.addStretch()
+        lay.addLayout(yil_row)
+
+        # Özel tarih aralığı
+        ozl = QHBoxLayout(); ozl.setSpacing(12)
+        self.dr_bas = tarih_input(); self.dr_bas.setDate(QDate(bugun.year(), bugun.month(), 1))
+        self.dr_bit = tarih_input(); self.dr_bit.setDate(bugun)
+        ozl.addWidget(etiket_input('ÖZEL BAŞLANGIÇ', self.dr_bas))
+        ozl.addWidget(etiket_input('ÖZEL BİTİŞ',     self.dr_bit))
+        ozl.addStretch()
+        lay.addLayout(ozl)
+
+        # Firma adı
+        self.dr_firma = QLineEdit(); self.dr_firma.setPlaceholderText('Firma Adı (opsiyonel)')
+        lay.addWidget(etiket_input('FİRMA ADI', self.dr_firma))
+
+        # Butonlar
+        btn_row = QHBoxLayout(); btn_row.setSpacing(8)
+        b_onizle  = btn('🔍  Önizle');        b_onizle.clicked.connect(self.donem_onizle)
+        b_pdf     = btn('📄  PDF Kaydet', 'btnYesil'); b_pdf.clicked.connect(self.donem_pdf_kaydet)
+        b_yazdir  = btn('🖨️  Yazdır', 'btnTehlike'); b_yazdir.clicked.connect(self.donem_yazdir)
+        for b in [b_onizle, b_pdf, b_yazdir]: btn_row.addWidget(b)
+        btn_row.addStretch()
+        lay.addLayout(btn_row)
+
+        ana.addWidget(kart)
+
+        # Özet önizleme alanı
+        self.dr_onizle = QFrame(); self.dr_onizle.setObjectName('formKart')
+        self.dr_onizle.setMinimumHeight(200)
+        self._dr_onizle_lay = QVBoxLayout(self.dr_onizle)
+        self._dr_onizle_lay.setContentsMargins(20, 16, 20, 16)
+        self._dr_bilgi = QLabel('Dönem seçip "Önizle" tuşuna basın.')
+        self._dr_bilgi.setStyleSheet('color:#5a6480; font-size:13px;')
+        self._dr_bilgi.setAlignment(Qt.AlignCenter)
+        self._dr_onizle_lay.addWidget(self._dr_bilgi)
+        ana.addWidget(self.dr_onizle)
+
+        return w
+
+    def _donem_parametreler(self):
+        bas = self.dr_bas.date().toString('yyyy-MM-dd')
+        bit = self.dr_bit.date().toString('yyyy-MM-dd')
+        firma = self.dr_firma.text().strip() or 'Firma Muhasebe Sistemi'
+        return bas, bit, firma
+
+    def donem_onizle(self):
+        bas, bit, firma = self._donem_parametreler()
+        hareketler = db.hareket_listesi(tarih_bas=bas, tarih_bit=bit)
+        top_gelir = sum(h['giris'] for h in hareketler)
+        top_gider = sum(h['cikis'] for h in hareketler)
+        net = top_gelir - top_gider
+
+        # Önizleme alanını temizle
+        while self._dr_onizle_lay.count():
+            item = self._dr_onizle_lay.takeAt(0)
+            if item.widget(): item.widget().deleteLater()
+
+        # Başlık
+        baslik = QLabel(f'📊  {self.dr_bas.date().toString("dd.MM.yyyy")}  —  {self.dr_bit.date().toString("dd.MM.yyyy")}')
+        baslik.setStyleSheet('font-size:15px; font-weight:700; color:#e8ecf4; margin-bottom:8px;')
+        self._dr_onizle_lay.addWidget(baslik)
+
+        # KPI satırı
+        kpi_row = QHBoxLayout()
+        for lbl, val, renk in [
+            ('Toplam Gelir',  para_format(top_gelir), '#2eca8b'),
+            ('Toplam Gider',  para_format(top_gider), '#ff4d6d'),
+            ('Net',           para_format(net),        '#2eca8b' if net >= 0 else '#ff4d6d'),
+            ('Hareket Sayısı', str(len(hareketler)),   '#e8ecf4'),
+        ]:
+            krt = QFrame(); krt.setObjectName('kpiKart')
+            kv = QVBoxLayout(krt); kv.setContentsMargins(14,10,14,10)
+            kv.addWidget(QLabel(lbl, styleSheet='font-size:10px; color:#5a6480;'))
+            kv.addWidget(QLabel(val, styleSheet=f'font-size:16px; font-weight:700; color:{renk}; font-family:Courier New;'))
+            kpi_row.addWidget(krt)
+        self._dr_onizle_lay.addLayout(kpi_row)
+
+        # Kategori özeti
+        kat_ozet = {}
+        for h in hareketler:
+            k = (h['tur'], h['ana_kategori'])
+            kat_ozet[k] = kat_ozet.get(k, 0) + h['tutar']
+
+        sep = QFrame(); sep.setFrameShape(QFrame.HLine); sep.setStyleSheet('color:#2a3050; margin:8px 0;')
+        self._dr_onizle_lay.addWidget(sep)
+
+        kat_label = QLabel('Kategori Dağılımı:')
+        kat_label.setStyleSheet('font-size:11px; font-weight:700; color:#8b96b0;')
+        self._dr_onizle_lay.addWidget(kat_label)
+
+        renk_map = {'Gelir':'#2eca8b','Gider':'#ff4d6d','Kasa Giriş':'#5b9aff'}
+        for (tur, ana), tutar in sorted(kat_ozet.items(), key=lambda x: -x[1]):
+            satir = QHBoxLayout()
+            lbl = QLabel(f"  [{tur}]  {ana}")
+            lbl.setStyleSheet(f'color:{renk_map.get(tur,"#e8ecf4")}; font-size:12px;')
+            val = QLabel(para_format(tutar))
+            val.setStyleSheet('font-weight:700; font-size:12px; font-family:Courier New;')
+            val.setAlignment(Qt.AlignRight)
+            satir.addWidget(lbl); satir.addWidget(val)
+            self._dr_onizle_lay.addLayout(satir)
+
+        self.status.showMessage(f'Önizleme: {len(hareketler)} hareket, {self.dr_bas.date().toString("dd.MM.yyyy")} - {self.dr_bit.date().toString("dd.MM.yyyy")}', 5000)
+
+    def donem_pdf_kaydet(self):
+        from PyQt5.QtWidgets import QFileDialog
+        from app.utils.rapor_pdf import rapor_uret
+        bas, bit, firma = self._donem_parametreler()
+        dosya, _ = QFileDialog.getSaveFileName(
+            self, 'PDF Kaydet',
+            f'donem_raporu_{bas}_{bit}.pdf',
+            'PDF Dosyası (*.pdf)'
+        )
+        if not dosya: return
+        try:
+            rapor_uret(dosya, bas, bit, firma)
+            self.status.showMessage(f'✅ PDF kaydedildi: {dosya}', 5000)
+            QMessageBox.information(self, 'Başarılı', f'Rapor PDF olarak kaydedildi:\n{dosya}')
+        except Exception as e:
+            QMessageBox.critical(self, 'Hata', f'PDF oluşturulamadı:\n{str(e)}')
+
+    def donem_yazdir(self):
+        import tempfile, subprocess, os
+        from app.utils.rapor_pdf import rapor_uret
+        bas, bit, firma = self._donem_parametreler()
+        try:
+            gecici = os.path.join(tempfile.gettempdir(), f'muhasebe_rapor_{bas}_{bit}.pdf')
+            rapor_uret(gecici, bas, bit, firma)
+            # Windows'ta varsayılan PDF uygulamasıyla aç (kullanıcı oradan yazdırır)
+            os.startfile(gecici)
+            self.status.showMessage('PDF açıldı — tarayıcıdan veya PDF görüntüleyiciden yazdırın.', 5000)
+        except AttributeError:
+            # Linux/Mac fallback
+            import subprocess
+            subprocess.run(['xdg-open', gecici])
+        except Exception as e:
+            QMessageBox.critical(self, 'Hata', f'Yazdırma hatası:\n{str(e)}')
 
     def _lay_temizle(self, layout):
         while layout.count():
