@@ -318,7 +318,6 @@ class AnaPencere(QMainWindow):
             'odeme': odeme, 'belge': self.g_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
-        self._h_dirty = True
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
         QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Gider kaydedildi: {no}', 4000)
@@ -388,7 +387,6 @@ class AnaPencere(QMainWindow):
             'odeme': tahsilat, 'belge': self.gl_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
-        self._h_dirty = True
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
         QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Gelir kaydedildi: {no}', 4000)
@@ -455,7 +453,6 @@ class AnaPencere(QMainWindow):
             'odeme': 'Nakit', 'belge': self.k_belge.text()
         })
         self.kpi_guncelle(); self.son_hareketler_yukle()
-        self._h_dirty = True
         QTimer.singleShot(300, self._filtre_kisi_guncelle)
         QTimer.singleShot(300, self._form_kisi_guncelle)
         self.status.showMessage(f'✅ Kasa girişi kaydedildi: {no}', 4000)
@@ -913,7 +910,6 @@ class AnaPencere(QMainWindow):
 
         self.kpi_guncelle()
         self.son_hareketler_yukle()
-        self._h_dirty = True
         self._hareketler_ilk_yukle()
         self.status.showMessage(f'✅ Hareket güncellendi: {h["islem_no"]}', 4000)
 
@@ -935,7 +931,6 @@ class AnaPencere(QMainWindow):
             kimden=kisi, odeme_turu=odeme,
             tutar_min=t_min, tutar_max=t_max, ara=ara
         )
-        self._son_filtre_listesi = liste
         self._sayfa_goster(liste)
 
     def _hareketler_temizle(self):
@@ -955,7 +950,6 @@ class AnaPencere(QMainWindow):
         cevap = QMessageBox.question(self, 'Onay', 'Bu hareketi silmek istediğinize emin misiniz?')
         if cevap == QMessageBox.Yes:
             db.hareket_sil(hid)
-            self._h_dirty = True
             self.kpi_guncelle(); self.son_hareketler_yukle()
             self._hareketler_ilk_yukle()
             self.status.showMessage('Hareket silindi.', 3000)
@@ -1212,22 +1206,16 @@ class AnaPencere(QMainWindow):
         elif idx == 4:
             self.kalemler_yukle()
         elif idx == 5:
-            # Dropdown'ları sadece ilk açılışta veya _h_dirty=True ise güncelle
-            if getattr(self, '_h_dirty', True):
-                QTimer.singleShot(0, self.filtre_dropdownlari_yenile)
-                self._h_dirty = False
-            # Tabloyu her zaman tazele ama son 30 günü göster (hızlı)
-            QTimer.singleShot(50, self._hareketler_ilk_yukle)
+            self.filtre_dropdownlari_yenile()
+            QTimer.singleShot(0, self._hareketler_ilk_yukle)
         elif idx == 6:
             QTimer.singleShot(0, self.tablo_filtrele)
         elif idx == 7:
             QTimer.singleShot(0, self.raporlar_yukle)
 
     def _hareketler_ilk_yukle(self):
-        """İlk açılışta sadece son 200 hareketi yükle — çok daha hızlı"""
-        self._son_filtre_listesi = db.hareket_listesi()  # tümünü cache'le
-        # İlk 200'ü göster
-        self._sayfa_goster(self._son_filtre_listesi)
+        liste = db.hareket_listesi()
+        self._sayfa_goster(liste)
 
     def _form_kisi_guncelle(self):
         """Gider/Gelir/Kasa formlarındaki kişi combo'larını mevcut hareket listesinden besle"""
