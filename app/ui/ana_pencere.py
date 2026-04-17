@@ -75,6 +75,8 @@ class AnaPencere(QMainWindow):
         self.tabs.addTab(self._tab_raporlar(),    '📈  Raporlar')
 
         self.tabs.currentChanged.connect(self._tab_degisti)
+        self._h_liste = []   # sayfalama için liste cache
+        self._h_sayfa = 0    # mevcut sayfa
         self.kpi_guncelle()
         self.son_hareketler_yukle()
 
@@ -622,6 +624,40 @@ class AnaPencere(QMainWindow):
         self.tbl_hareketler = self._tablo(sutunlar)
         self.tbl_hareketler.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         ana.addWidget(self.tbl_hareketler)
+
+        # Sayfalama çubuğu
+        self._h_sayfa = 0          # mevcut sayfa (0-indexed)
+        self._h_liste = []         # tüm filtrelenmiş liste
+        self.SAYFA_BOYUTU = 100    # sayfa başı kayıt
+
+        sayfa_bar = QFrame(); sayfa_bar.setObjectName('formKart')
+        sayfa_bar.setFixedHeight(48)
+        sb_lay = QHBoxLayout(sayfa_bar); sb_lay.setContentsMargins(12,0,12,0); sb_lay.setSpacing(8)
+
+        self.btn_ilk   = QPushButton('⏮'); self.btn_ilk.setFixedWidth(36)
+        self.btn_geri  = QPushButton('◀'); self.btn_geri.setFixedWidth(36)
+        self.lbl_sayfa = QLabel('—'); self.lbl_sayfa.setAlignment(Qt.AlignCenter)
+        self.lbl_sayfa.setStyleSheet('color:#8b96b0; font-size:13px; min-width:160px;')
+        self.btn_ileri = QPushButton('▶'); self.btn_ileri.setFixedWidth(36)
+        self.btn_son   = QPushButton('⏭'); self.btn_son.setFixedWidth(36)
+
+        for b in [self.btn_ilk, self.btn_geri, self.btn_ileri, self.btn_son]:
+            b.setObjectName('btnTehlike')
+            b.setStyleSheet('font-size:14px; padding:4px;')
+
+        self.btn_ilk.clicked.connect(lambda: self._sayfa_git(0))
+        self.btn_geri.clicked.connect(lambda: self._sayfa_git(self._h_sayfa - 1))
+        self.btn_ileri.clicked.connect(lambda: self._sayfa_git(self._h_sayfa + 1))
+        self.btn_son.clicked.connect(lambda: self._sayfa_git(self._h_sayfa_toplam() - 1))
+
+        sb_lay.addStretch()
+        sb_lay.addWidget(self.btn_ilk)
+        sb_lay.addWidget(self.btn_geri)
+        sb_lay.addWidget(self.lbl_sayfa)
+        sb_lay.addWidget(self.btn_ileri)
+        sb_lay.addWidget(self.btn_son)
+        sb_lay.addStretch()
+        ana.addWidget(sayfa_bar)
         return w
 
     def _filtre_kategori_guncelle(self, tur_text):
@@ -693,22 +729,35 @@ class AnaPencere(QMainWindow):
                 self.f_kisi.setCurrentText(onceki)
         self.f_kisi.blockSignals(False)
 
-    SAYFA_BOYUTU = 200  # Tek seferde gösterilecek maksimum kayıt
+    def _h_sayfa_toplam(self):
+        if not self._h_liste: return 1
+        import math
+        return math.ceil(len(self._h_liste) / self.SAYFA_BOYUTU)
 
-    def _sayfa_goster(self, liste):
-        """Listeyi tabloya yükler, 200'den fazlaysa alt bilgi gösterir"""
+    def _sayfa_goster(self, liste, sayfa=0):
+        """Listeyi sayfalar halinde tabloya yükler"""
+        self._h_liste = liste
+        self._h_sayfa = max(0, min(sayfa, self._h_sayfa_toplam() - 1))
+        bas = self._h_sayfa * self.SAYFA_BOYUTU
+        bit = bas + self.SAYFA_BOYUTU
+        self.hareketler_yukle(liste[bas:bit])
+
         toplam = len(liste)
-        gosterilen = liste[:self.SAYFA_BOYUTU]
-        self.hareketler_yukle(gosterilen)
+        toplam_sayfa = self._h_sayfa_toplam()
+        gosterilen_bas = bas + 1 if toplam else 0
+        gosterilen_bit = min(bit, toplam)
 
-        if toplam > self.SAYFA_BOYUTU:
-            self.h_sayisi.setText(
-                f'{toplam} kayıt — ilk {self.SAYFA_BOYUTU} gösteriliyor  '
-                f'(Filtrele ile daraltın veya CSV\'ye aktarın)'
-            )
-            self.h_sayisi.setStyleSheet('color:#ffc107; font-size:13px; font-weight:600;')
-        else:
-            self.h_sayisi.setStyleSheet('color:#e8ecf4; font-size:13px; font-weight:600;')
+        self.h_sayisi.setText(
+            f'{toplam} kayıt  —  {gosterilen_bas}-{gosterilen_bit} arası gösteriliyor'
+        )
+        self.lbl_sayfa.setText(f'Sayfa  {self._h_sayfa + 1}  /  {toplam_sayfa}')
+        self.btn_ilk.setEnabled(self._h_sayfa > 0)
+        self.btn_geri.setEnabled(self._h_sayfa > 0)
+        self.btn_ileri.setEnabled(self._h_sayfa < toplam_sayfa - 1)
+        self.btn_son.setEnabled(self._h_sayfa < toplam_sayfa - 1)
+
+    def _sayfa_git(self, sayfa):
+        self._sayfa_goster(self._h_liste, sayfa)
 
     def hareketler_yukle(self, liste=None):
         if liste is None:
