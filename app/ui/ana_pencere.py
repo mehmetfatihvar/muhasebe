@@ -134,6 +134,7 @@ class AnaPencere(QMainWindow):
         for txt, slot, oid in [
             ('💾  Yedekle',    self.yedekle,    'btnTehlike'),
             ('📂  Yedek Yükle', self.yedek_yukle, 'btnTehlike'),
+            ('🔐  PIN Değiştir', self.pin_degistir, 'btnTehlike'),
         ]:
             b = QPushButton(txt); b.setObjectName(oid)
             b.setStyleSheet('font-size:14px; padding:8px 18px;')
@@ -1285,6 +1286,11 @@ class AnaPencere(QMainWindow):
             combo_w.blockSignals(False)
 
     # ─────────────────────────── YEDEK ─────────────────────────────────
+    def pin_degistir(self):
+        from app.ui.pin_ekrani import PinDegistirEkrani
+        dlg = PinDegistirEkrani(self)
+        dlg.exec_()
+
     def yedekle(self):
         dosya, _ = QFileDialog.getSaveFileName(
             self, 'Yedek Kaydet', f'muhasebe_yedek_{date.today()}.json',

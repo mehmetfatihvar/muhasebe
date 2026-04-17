@@ -58,14 +58,39 @@ def veritabani_olustur():
             belge_no TEXT,
             bakiye REAL,
             durum TEXT DEFAULT '✅',
-            kayit_tarihi TEXT
+            kayit_tarihi TEXT,
+            silindi INTEGER DEFAULT 0,
+            silinme_tarihi TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sayaclar (
             tur TEXT PRIMARY KEY,
             deger INTEGER DEFAULT 0
         );
+
+        CREATE TABLE IF NOT EXISTS degisiklik_logu (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            islem_no TEXT,
+            hareket_id INTEGER,
+            islem_turu TEXT,
+            eski_deger TEXT,
+            yeni_deger TEXT,
+            tarih TEXT,
+            aciklama TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS ayarlar (
+            anahtar TEXT PRIMARY KEY,
+            deger TEXT
+        );
     """)
+
+    # Mevcut DB'ye yeni sütunlar ekle (migration)
+    try: c.execute("ALTER TABLE hareketler ADD COLUMN silindi INTEGER DEFAULT 0")
+    except: pass
+    try: c.execute("ALTER TABLE hareketler ADD COLUMN silinme_tarihi TEXT")
+    except: pass
+
     # Sayaçları başlat
     for tur in ['GD', 'GL', 'KG']:
         c.execute("INSERT OR IGNORE INTO sayaclar VALUES (?, 0)", (tur,))
@@ -181,15 +206,66 @@ def hareket_ekle(veri: dict):
     return no
 
 def hareket_sil(hid):
+    """Hareketi fiziksel silmez, silindi=1 olarak işaretler ve loga yazar."""
     conn = baglanti()
-    conn.execute("DELETE FROM hareketler WHERE id=?", (hid,))
-    # Bakiyeleri yeniden hesapla
-    rows = conn.execute("SELECT id,giris,cikis FROM hareketler ORDER BY id").fetchall()
+    h = conn.execute("SELECT * FROM hareketler WHERE id=?", (hid,)).fetchone()
+    if h:
+        conn.execute(
+            "UPDATE hareketler SET silindi=1, silinme_tarihi=? WHERE id=?",
+            (datetime.now().strftime('%d.%m.%Y %H:%M'), hid)
+        )
+        # Denetim logu
+        import json as _json
+        conn.execute("""
+            INSERT INTO degisiklik_logu (islem_no, hareket_id, islem_turu, eski_deger, tarih, aciklama)
+            VALUES (?,?,?,?,?,?)
+        """, (
+            h['islem_no'], hid, 'SİLME',
+            _json.dumps(dict(h), ensure_ascii=False),
+            datetime.now().strftime('%d.%m.%Y %H:%M'),
+            'Kullanıcı tarafından silindi'
+        ))
+    conn.commit()
+    # Bakiyeleri yeniden hesapla (sadece silinmemiş kayıtlar)
+    _bakiye_hesapla(conn)
+    conn.commit(); conn.close()
+
+def _bakiye_hesapla(conn):
+    """Silinmemiş tüm hareketlerin bakiyesini tarih+id sırasına göre hesapla."""
+    rows = conn.execute(
+        "SELECT id,giris,cikis FROM hareketler WHERE silindi=0 ORDER BY tarih,id"
+    ).fetchall()
     bak = 0
     for r in rows:
         bak += r['giris'] - r['cikis']
         conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
-    conn.commit(); conn.close()
+
+def degisiklik_logu_ekle(conn, islem_no, hareket_id, islem_turu, eski, yeni, aciklama=''):
+    import json as _json
+    conn.execute("""
+        INSERT INTO degisiklik_logu (islem_no, hareket_id, islem_turu, eski_deger, yeni_deger, tarih, aciklama)
+        VALUES (?,?,?,?,?,?,?)
+    """, (
+        islem_no, hareket_id, islem_turu,
+        _json.dumps(eski, ensure_ascii=False) if isinstance(eski, dict) else str(eski),
+        _json.dumps(yeni, ensure_ascii=False) if isinstance(yeni, dict) else str(yeni),
+        datetime.now().strftime('%d.%m.%Y %H:%M'),
+        aciklama
+    ))
+
+def degisiklik_loglari(hareket_id=None):
+    """Denetim loglarını getirir. hareket_id verilirse sadece o harekete ait logları döner."""
+    conn = baglanti()
+    if hareket_id:
+        rows = conn.execute(
+            "SELECT * FROM degisiklik_logu WHERE hareket_id=? ORDER BY id DESC", (hareket_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM degisiklik_logu ORDER BY id DESC LIMIT 200"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 def hareket_guncelle(hid, veri: dict):
     tur = veri['tur']
@@ -207,12 +283,17 @@ def hareket_guncelle(hid, veri: dict):
         tarih_db = tarih_ham
 
     conn = baglanti()
+    # Eski değeri log için al
+    eski = conn.execute("SELECT * FROM hareketler WHERE id=?", (hid,)).fetchone()
+    eski_dict = dict(eski) if eski else {}
+    islem_no = eski_dict.get('islem_no', '')
+
     conn.execute("""
         UPDATE hareketler SET
             tarih=?, tur=?, ana_kategori=?, alt_kategori=?, kalem_adi=?,
             aciklama=?, tutar=?, giris=?, cikis=?,
             kimden_kime=?, odeme_turu=?, belge_no=?
-        WHERE id=?
+        WHERE id=? AND silindi=0
     """, (
         tarih_db, tur,
         veri.get('ana',''), veri.get('alt',''), veri.get('kalem',''),
@@ -220,12 +301,10 @@ def hareket_guncelle(hid, veri: dict):
         veri.get('kimden',''), veri.get('odeme',''), veri.get('belge',''),
         hid
     ))
-    # Tüm bakiyeleri yeniden hesapla
-    rows = conn.execute("SELECT id,giris,cikis FROM hareketler ORDER BY tarih,id").fetchall()
-    bak = 0
-    for r in rows:
-        bak += r['giris'] - r['cikis']
-        conn.execute("UPDATE hareketler SET bakiye=? WHERE id=?", (bak, r['id']))
+    # Denetim logu
+    degisiklik_logu_ekle(conn, islem_no, hid, 'GÜNCELLEME', eski_dict, veri, 'Kullanıcı düzenledi')
+    # Bakiyeleri sadece silinmemiş kayıtlar üzerinden hesapla
+    _bakiye_hesapla(conn)
     conn.commit(); conn.close()
 
 def hareket_getir(hid):
@@ -249,7 +328,7 @@ def hareket_listesi(tarih_bas=None, tarih_bit=None, tur=None, ara=None,
                     kalem=None, ana_kategori=None, kimden=None,
                     tutar_min=None, tutar_max=None, odeme_turu=None):
     conn = baglanti()
-    q = "SELECT * FROM hareketler WHERE 1=1"
+    q = "SELECT * FROM hareketler WHERE silindi=0"
     params = []
     if tarih_bas:     q += " AND tarih >= ?";              params.append(tarih_bas)
     if tarih_bit:     q += " AND tarih <= ?";              params.append(tarih_bit)
@@ -316,6 +395,42 @@ def genel_ozet():
     return d
 
 # ── YEDEKLEME ──────────────────────────────────────────
+def otomatik_yedek_klasoru():
+    """Yedeklerin saklanacağı klasör — uygulama yanında 'yedekler/' klasörü"""
+    klasor = os.path.join(_uygulama_klasoru(), 'yedekler')
+    os.makedirs(klasor, exist_ok=True)
+    return klasor
+
+def gunluk_otomatik_yedek():
+    """
+    Uygulama açılışında çağrılır.
+    Bugün yedek alınmadıysa alır, 30 günden eski yedekleri siler.
+    """
+    klasor = otomatik_yedek_klasoru()
+    bugun = datetime.now().strftime('%Y-%m-%d')
+    yedek_dosya = os.path.join(klasor, f'otomatik_{bugun}.json')
+
+    # Bugün zaten yedek alındıysa atla
+    if os.path.exists(yedek_dosya):
+        return None
+
+    # Yedek al
+    json_yedek_al(yedek_dosya)
+
+    # 30 günden eski otomatik yedekleri sil
+    simdi = datetime.now()
+    for dosya in os.listdir(klasor):
+        if not dosya.startswith('otomatik_'): continue
+        tam_yol = os.path.join(klasor, dosya)
+        try:
+            degisim = datetime.fromtimestamp(os.path.getmtime(tam_yol))
+            if (simdi - degisim).days > 30:
+                os.remove(tam_yol)
+        except Exception:
+            pass
+
+    return yedek_dosya
+
 def json_yedek_al(dosya_yolu):
     veri = {
         'kalemler': kalem_listesi(),
@@ -365,3 +480,31 @@ def json_yedek_yukle(dosya_yolu):
              h.get('bakiye',0), h.get('kayit_tarihi',''))
         )
     conn.commit(); conn.close()
+
+# ── AYARLAR ────────────────────────────────────────────
+def ayar_oku(anahtar, varsayilan=None):
+    conn = baglanti()
+    row = conn.execute("SELECT deger FROM ayarlar WHERE anahtar=?", (anahtar,)).fetchone()
+    conn.close()
+    return row[0] if row else varsayilan
+
+def ayar_yaz(anahtar, deger):
+    conn = baglanti()
+    conn.execute("INSERT OR REPLACE INTO ayarlar VALUES (?,?)", (anahtar, str(deger)))
+    conn.commit(); conn.close()
+
+def pin_kontrol(pin):
+    """Girilen PIN doğru mu?"""
+    import hashlib
+    kayitli = ayar_oku('pin_hash')
+    if not kayitli:
+        return True  # PIN henüz tanımlanmamış, geç
+    return hashlib.sha256(pin.encode()).hexdigest() == kayitli
+
+def pin_kaydet(pin):
+    """Yeni PIN kaydet."""
+    import hashlib
+    ayar_yaz('pin_hash', hashlib.sha256(pin.encode()).hexdigest())
+
+def pin_var_mi():
+    return ayar_oku('pin_hash') is not None
