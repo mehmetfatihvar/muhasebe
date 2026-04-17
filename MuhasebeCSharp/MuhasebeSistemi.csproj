@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>MuhasebeSistemi</AssemblyName>
+    <RootNamespace>MuhasebeSistemi</RootNamespace>
+    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Company>MFV</Company>
+    <Product>Firma Muhasebe ve Kasa Takip Sistemi</Product>
+    <Copyright>MFV © 2026</Copyright>
+    <!-- Tek exe olarak yayınla -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.ico" Condition="Exists('Assets\logo.ico')" />
+  </ItemGroup>
+
+</Project>
