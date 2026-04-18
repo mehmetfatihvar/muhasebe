@@ -348,37 +348,6 @@ public class Database
         File.WriteAllText(dosyaYolu, json, System.Text.Encoding.UTF8);
     }
 
-    // ── YARDIMCI ────────────────────────────────────────────────────────
-    private static string NormalizeTarih(string t)
-    {
-        if (string.IsNullOrEmpty(t)) return DateTime.Now.ToString("yyyy-MM-dd");
-        if (DateTime.TryParseExact(t, "dd.MM.yyyy",
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None, out var d1))
-            return d1.ToString("yyyy-MM-dd");
-        if (DateTime.TryParseExact(t, "yyyy-MM-dd",
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.None, out var d2))
-            return d2.ToString("yyyy-MM-dd");
-        return t;
-    }
-}
-
-// Hareket girdi modeli
-public class HareketGirdisi
-{
-    public string Tarih { get; set; } = "";
-    public string Tur { get; set; } = "";
-    public string AnaKategori { get; set; } = "";
-    public string AltKategori { get; set; } = "";
-    public string KalemAdi { get; set; } = "";
-    public decimal Tutar { get; set; }
-    public string OdemeTuru { get; set; } = "";
-    public string KimdenKime { get; set; } = "";
-    public string BelgeNo { get; set; } = "";
-    public string Aciklama { get; set; } = "";
-}
-
     public void JsonYedekYukle(string dosyaYolu)
     {
         var json = File.ReadAllText(dosyaYolu, System.Text.Encoding.UTF8);
@@ -434,5 +403,35 @@ public class HareketGirdisi
                     ("@ba",  double.TryParse(h.TryGetProp("bakiye"), out var ba) ? ba : 0),
                     ("@kt",  h.TryGetProp("kayit_tarihi")));
             }
-        conn.CommitIfTransaction();
     }
+
+    // ── YARDIMCI ────────────────────────────────────────────────────────
+    private static string NormalizeTarih(string t)
+    {
+        if (string.IsNullOrEmpty(t)) return DateTime.Now.ToString("yyyy-MM-dd");
+        if (DateTime.TryParseExact(t, "dd.MM.yyyy",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var d1))
+            return d1.ToString("yyyy-MM-dd");
+        if (DateTime.TryParseExact(t, "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var d2))
+            return d2.ToString("yyyy-MM-dd");
+        return t;
+    }
+}
+
+// Hareket girdi modeli
+public class HareketGirdisi
+{
+    public string Tarih { get; set; } = "";
+    public string Tur { get; set; } = "";
+    public string AnaKategori { get; set; } = "";
+    public string AltKategori { get; set; } = "";
+    public string KalemAdi { get; set; } = "";
+    public decimal Tutar { get; set; }
+    public string OdemeTuru { get; set; } = "";
+    public string KimdenKime { get; set; } = "";
+    public string BelgeNo { get; set; } = "";
+    public string Aciklama { get; set; } = "";
+}
