@@ -254,7 +254,6 @@
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="{StaticResource Text2Brush}"/>
         <Setter Property="Margin" Value="0,0,0,4"/>
-        <Setter Property="TextTransform" Value="Uppercase"/>
     </Style>
 
     <!-- ── TABCONTROL ──────────────────────────────────────────────────── -->
