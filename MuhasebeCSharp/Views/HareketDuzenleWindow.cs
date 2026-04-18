@@ -26,7 +26,7 @@ public class HareketDuzenleWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = (Brush)Application.Current.Resources["BgBrush"];
 
-        var sp = new StackPanel { Margin = new Thickness(24, 20, 24, 20), Spacing = 14 };
+        var sp = new StackPanel { Margin = new Thickness(24, 20, 24, 20) };
 
         sp.Children.Add(new TextBlock
         {
