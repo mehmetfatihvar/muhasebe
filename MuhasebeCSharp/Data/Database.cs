@@ -252,15 +252,15 @@ public class Database
         decimal? tutarMax = null, string? ara = null)
     {
         var q = "SELECT * FROM hareketler WHERE 1=1";
-        var prms = new List<(string, object)>();
+        var prms = new List<(string name, object? value)>();
 
-        if (!string.IsNullOrEmpty(tarihBas)) { q += " AND tarih >= @bas"; prms.Add(("@bas", tarihBas!)); }
-        if (!string.IsNullOrEmpty(tarihBit)) { q += " AND tarih <= @bit"; prms.Add(("@bit", tarihBit!)); }
-        if (!string.IsNullOrEmpty(tur)) { q += " AND tur = @tur"; prms.Add(("@tur", tur!)); }
-        if (!string.IsNullOrEmpty(anaKategori)) { q += " AND ana_kategori = @ana"; prms.Add(("@ana", anaKategori!)); }
-        if (!string.IsNullOrEmpty(kalem)) { q += " AND kalem_adi LIKE @kal"; prms.Add(("@kal", $"%{kalem}%")); }
-        if (!string.IsNullOrEmpty(kimden)) { q += " AND kimden_kime LIKE @ki"; prms.Add(("@ki", $"%{kimden}%")); }
-        if (!string.IsNullOrEmpty(odemeTuru)) { q += " AND odeme_turu = @od"; prms.Add(("@od", odemeTuru!)); }
+        if (!string.IsNullOrEmpty(tarihBas)) { q += " AND tarih >= @bas"; prms.Add(("@bas", tarihBas)); }
+        if (!string.IsNullOrEmpty(tarihBit)) { q += " AND tarih <= @bit"; prms.Add(("@bit", tarihBit)); }
+        if (!string.IsNullOrEmpty(tur))      { q += " AND tur = @tur";    prms.Add(("@tur", tur)); }
+        if (!string.IsNullOrEmpty(anaKategori)) { q += " AND ana_kategori = @ana"; prms.Add(("@ana", anaKategori)); }
+        if (!string.IsNullOrEmpty(kalem))    { q += " AND kalem_adi LIKE @kal"; prms.Add(("@kal", $"%{kalem}%")); }
+        if (!string.IsNullOrEmpty(kimden))   { q += " AND kimden_kime LIKE @ki"; prms.Add(("@ki", $"%{kimden}%")); }
+        if (!string.IsNullOrEmpty(odemeTuru)){ q += " AND odeme_turu = @od"; prms.Add(("@od", odemeTuru)); }
         if (tutarMin.HasValue) { q += " AND tutar >= @tmin"; prms.Add(("@tmin", (double)tutarMin.Value)); }
         if (tutarMax.HasValue) { q += " AND tutar <= @tmax"; prms.Add(("@tmax", (double)tutarMax.Value)); }
         if (!string.IsNullOrEmpty(ara))
@@ -354,55 +354,63 @@ public class Database
         var doc = System.Text.Json.JsonDocument.Parse(json);
 
         using var conn = Baglanti(); conn.Open();
-        conn.ExecuteNonQuery("DELETE FROM hareketler");
-        conn.ExecuteNonQuery("DELETE FROM kalemler");
-        conn.ExecuteNonQuery("DELETE FROM sayaclar");
-        foreach (var t in new[] { "GD", "GL", "KG" })
-            conn.ExecuteNonQuery("INSERT INTO sayaclar VALUES (@t,0)", ("@t", t));
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            conn.ExecuteNonQuery("DELETE FROM hareketler");
+            conn.ExecuteNonQuery("DELETE FROM kalemler");
+            conn.ExecuteNonQuery("DELETE FROM sayaclar");
+            foreach (var t in new[] { "GD", "GL", "KG" })
+                conn.ExecuteNonQuery("INSERT INTO sayaclar VALUES (@t,0)", ("@t", (object)t));
 
-        if (doc.RootElement.TryGetProperty("kalemler", out var kalemler))
-            foreach (var k in kalemler.EnumerateArray())
-            {
-                conn.ExecuteNonQuery(@"INSERT OR IGNORE INTO kalemler
-                    (tur,ana_kategori,alt_kategori,kalem_adi,aciklama,eklenme_tarihi)
-                    VALUES (@t,@a,@al,@ad,@ac,@e)",
-                    ("@t",  k.TryGetProp("tur")),
-                    ("@a",  k.TryGetProp("ana_kategori") ?? k.TryGetProp("ana")),
-                    ("@al", k.TryGetProp("alt_kategori") ?? k.TryGetProp("alt")),
-                    ("@ad", k.TryGetProp("kalem_adi") ?? k.TryGetProp("ad")),
-                    ("@ac", k.TryGetProp("aciklama")),
-                    ("@e",  k.TryGetProp("eklenme_tarihi") ?? k.TryGetProp("tarih")));
-            }
+            if (doc.RootElement.TryGetProperty("kalemler", out var kalemler))
+                foreach (var k in kalemler.EnumerateArray())
+                    conn.ExecuteNonQuery(@"INSERT OR IGNORE INTO kalemler
+                        (tur,ana_kategori,alt_kategori,kalem_adi,aciklama,eklenme_tarihi)
+                        VALUES (@t,@a,@al,@ad,@ac,@e)",
+                        ("@t",  (object)(k.TryGetProp("tur") ?? "")),
+                        ("@a",  (object)(k.TryGetProp("ana_kategori") ?? k.TryGetProp("ana") ?? "")),
+                        ("@al", (object)(k.TryGetProp("alt_kategori") ?? k.TryGetProp("alt") ?? "")),
+                        ("@ad", (object)(k.TryGetProp("kalem_adi") ?? k.TryGetProp("ad") ?? "")),
+                        ("@ac", (object)(k.TryGetProp("aciklama") ?? "")),
+                        ("@e",  (object)(k.TryGetProp("eklenme_tarihi") ?? k.TryGetProp("tarih") ?? "")));
 
-        if (doc.RootElement.TryGetProperty("hareketler", out var hareketler))
-            foreach (var h in hareketler.EnumerateArray())
-            {
-                var no = h.TryGetProp("islem_no") ?? h.TryGetProp("no") ?? "";
-                var prefix = no.Length >= 2 ? no[..2] : "GD";
-                if (int.TryParse(no.Split('-').LastOrDefault(), out var sayi))
-                    conn.ExecuteNonQuery("UPDATE sayaclar SET deger=MAX(deger,@s) WHERE tur=@t",
-                        ("@s", sayi), ("@t", prefix));
+            if (doc.RootElement.TryGetProperty("hareketler", out var hareketler))
+                foreach (var h in hareketler.EnumerateArray())
+                {
+                    var no = h.TryGetProp("islem_no") ?? h.TryGetProp("no") ?? "";
+                    var prefix = no.Length >= 2 ? no[..2] : "GD";
+                    if (int.TryParse(no.Split('-').LastOrDefault(), out var sayi))
+                        conn.ExecuteNonQuery("UPDATE sayaclar SET deger=MAX(deger,@s) WHERE tur=@t",
+                            ("@s", (object)sayi), ("@t", (object)prefix));
 
-                conn.ExecuteNonQuery(@"INSERT OR IGNORE INTO hareketler
-                    (islem_no,tarih,tur,ana_kategori,alt_kategori,kalem_adi,aciklama,
-                     tutar,giris,cikis,kimden_kime,odeme_turu,belge_no,bakiye,kayit_tarihi)
-                    VALUES (@no,@t,@tur,@ana,@alt,@kal,@ac,@tu,@gi,@ci,@ki,@od,@be,@ba,@kt)",
-                    ("@no",  no),
-                    ("@t",   h.TryGetProp("tarih")),
-                    ("@tur", h.TryGetProp("tur")),
-                    ("@ana", h.TryGetProp("ana_kategori") ?? h.TryGetProp("ana")),
-                    ("@alt", h.TryGetProp("alt_kategori") ?? h.TryGetProp("alt")),
-                    ("@kal", h.TryGetProp("kalem_adi") ?? h.TryGetProp("kalem")),
-                    ("@ac",  h.TryGetProp("aciklama")),
-                    ("@tu",  double.TryParse(h.TryGetProp("tutar"), out var tu) ? tu : 0),
-                    ("@gi",  double.TryParse(h.TryGetProp("giris"), out var gi) ? gi : 0),
-                    ("@ci",  double.TryParse(h.TryGetProp("cikis"), out var ci) ? ci : 0),
-                    ("@ki",  h.TryGetProp("kimden_kime") ?? h.TryGetProp("kimden")),
-                    ("@od",  h.TryGetProp("odeme_turu") ?? h.TryGetProp("odeme")),
-                    ("@be",  h.TryGetProp("belge_no") ?? h.TryGetProp("belge")),
-                    ("@ba",  double.TryParse(h.TryGetProp("bakiye"), out var ba) ? ba : 0),
-                    ("@kt",  h.TryGetProp("kayit_tarihi")));
-            }
+                    conn.ExecuteNonQuery(@"INSERT OR IGNORE INTO hareketler
+                        (islem_no,tarih,tur,ana_kategori,alt_kategori,kalem_adi,aciklama,
+                         tutar,giris,cikis,kimden_kime,odeme_turu,belge_no,bakiye,kayit_tarihi)
+                        VALUES (@no,@t,@tur,@ana,@alt,@kal,@ac,@tu,@gi,@ci,@ki,@od,@be,@ba,@kt)",
+                        ("@no",  (object)no),
+                        ("@t",   (object)(h.TryGetProp("tarih") ?? "")),
+                        ("@tur", (object)(h.TryGetProp("tur") ?? "")),
+                        ("@ana", (object)(h.TryGetProp("ana_kategori") ?? h.TryGetProp("ana") ?? "")),
+                        ("@alt", (object)(h.TryGetProp("alt_kategori") ?? h.TryGetProp("alt") ?? "")),
+                        ("@kal", (object)(h.TryGetProp("kalem_adi") ?? h.TryGetProp("kalem") ?? "")),
+                        ("@ac",  (object)(h.TryGetProp("aciklama") ?? "")),
+                        ("@tu",  (object)(double.TryParse(h.TryGetProp("tutar"), out var tu) ? tu : 0)),
+                        ("@gi",  (object)(double.TryParse(h.TryGetProp("giris"), out var gi) ? gi : 0)),
+                        ("@ci",  (object)(double.TryParse(h.TryGetProp("cikis"), out var ci) ? ci : 0)),
+                        ("@ki",  (object)(h.TryGetProp("kimden_kime") ?? h.TryGetProp("kimden") ?? "")),
+                        ("@od",  (object)(h.TryGetProp("odeme_turu") ?? h.TryGetProp("odeme") ?? "")),
+                        ("@be",  (object)(h.TryGetProp("belge_no") ?? h.TryGetProp("belge") ?? "")),
+                        ("@ba",  (object)(double.TryParse(h.TryGetProp("bakiye"), out var ba) ? ba : 0)),
+                        ("@kt",  (object)(h.TryGetProp("kayit_tarihi") ?? "")));
+                }
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
     }
 
     // ── YARDIMCI ────────────────────────────────────────────────────────

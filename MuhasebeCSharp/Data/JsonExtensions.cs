@@ -11,8 +11,3 @@ public static class JsonExtensions
         return null;
     }
 }
-
-public static class SqliteConnExtensions
-{
-    public static void CommitIfTransaction(this Microsoft.Data.Sqlite.SqliteConnection conn) { }
-}

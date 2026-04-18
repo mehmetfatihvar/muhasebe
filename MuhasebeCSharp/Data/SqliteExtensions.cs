@@ -1,5 +1,4 @@
 using Microsoft.Data.Sqlite;
-using MuhasebeSistemi.Models;
 
 namespace MuhasebeSistemi.Data;
 

@@ -495,18 +495,25 @@ public partial class MainWindow : Window
         System.IO.File.WriteAllLines(dlg.FileName,lines,System.Text.Encoding.UTF8);SetStatus($"✅ CSV: {dlg.FileName}");
     }
 
-    private void HareketSil_Click(object s,RoutedEventArgs e)
+    private Hareket? DataGridSatirAl(object sender)
     {
-        if(_hGrid?.CurrentItem is not Hareket h)return;
-        if(MessageBox.Show($"{h.IslemNo} silinsin mi?","Onay",MessageBoxButton.YesNo)==MessageBoxResult.Yes)
-        {_db.HareketSil(h.Id);KpiGuncelle();HareketlerIlkYukle();SetStatus("Hareket silindi.");}
+        // Button'un DataContext'inden satırı al (CurrentItem unreliable)
+        if (sender is Button btn && btn.DataContext is Hareket h) return h;
+        return _hGrid?.CurrentItem as Hareket;
     }
 
-    private void HareketDuzenle_Click(object s,RoutedEventArgs e)
+    private void HareketSil_Click(object s, RoutedEventArgs e)
     {
-        if(_hGrid?.CurrentItem is not Hareket h)return;
-        var dlg=new HareketDuzenleWindow(_db,h.Id){Owner=this};
-        if(dlg.ShowDialog()==true){KpiGuncelle();HareketlerIlkYukle();SetStatus($"✅ Güncellendi: {h.IslemNo}");}
+        var h = DataGridSatirAl(s); if (h == null) return;
+        if (MessageBox.Show($"{h.IslemNo} silinsin mi?", "Onay", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+        { _db.HareketSil(h.Id); KpiGuncelle(); HareketlerIlkYukle(); SetStatus("Hareket silindi."); }
+    }
+
+    private void HareketDuzenle_Click(object s, RoutedEventArgs e)
+    {
+        var h = DataGridSatirAl(s); if (h == null) return;
+        var dlg = new HareketDuzenleWindow(_db, h.Id) { Owner = this };
+        if (dlg.ShowDialog() == true) { KpiGuncelle(); HareketlerIlkYukle(); SetStatus($"✅ Güncellendi: {h.IslemNo}"); }
     }
 
     // ── YARDIMCI ────────────────────────────────────────────────────────
