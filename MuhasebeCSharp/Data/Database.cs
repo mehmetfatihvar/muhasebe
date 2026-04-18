@@ -384,6 +384,12 @@ public class Database
                         conn.ExecuteNonQuery("UPDATE sayaclar SET deger=MAX(deger,@s) WHERE tur=@t",
                             ("@s", (object)sayi), ("@t", (object)prefix));
 
+                    // Sayısal alanları doğrudan JsonElement'ten oku (locale bağımsız)
+                    var tutar  = JsonSayi(h, "tutar");
+                    var giris  = JsonSayi(h, "giris");
+                    var cikis  = JsonSayi(h, "cikis");
+                    var bakiye = JsonSayi(h, "bakiye");
+
                     conn.ExecuteNonQuery(@"INSERT OR IGNORE INTO hareketler
                         (islem_no,tarih,tur,ana_kategori,alt_kategori,kalem_adi,aciklama,
                          tutar,giris,cikis,kimden_kime,odeme_turu,belge_no,bakiye,kayit_tarihi)
@@ -395,15 +401,18 @@ public class Database
                         ("@alt", (object)(h.TryGetProp("alt_kategori") ?? h.TryGetProp("alt") ?? "")),
                         ("@kal", (object)(h.TryGetProp("kalem_adi") ?? h.TryGetProp("kalem") ?? "")),
                         ("@ac",  (object)(h.TryGetProp("aciklama") ?? "")),
-                        ("@tu",  (object)(double.TryParse(h.TryGetProp("tutar"), out var tu) ? tu : 0)),
-                        ("@gi",  (object)(double.TryParse(h.TryGetProp("giris"), out var gi) ? gi : 0)),
-                        ("@ci",  (object)(double.TryParse(h.TryGetProp("cikis"), out var ci) ? ci : 0)),
+                        ("@tu",  (object)tutar),
+                        ("@gi",  (object)giris),
+                        ("@ci",  (object)cikis),
                         ("@ki",  (object)(h.TryGetProp("kimden_kime") ?? h.TryGetProp("kimden") ?? "")),
                         ("@od",  (object)(h.TryGetProp("odeme_turu") ?? h.TryGetProp("odeme") ?? "")),
                         ("@be",  (object)(h.TryGetProp("belge_no") ?? h.TryGetProp("belge") ?? "")),
-                        ("@ba",  (object)(double.TryParse(h.TryGetProp("bakiye"), out var ba) ? ba : 0)),
+                        ("@ba",  (object)bakiye),
                         ("@kt",  (object)(h.TryGetProp("kayit_tarihi") ?? "")));
                 }
+
+            // Bakiyeleri yeniden hesapla (yedekteki eski bakiye değerlerini ezip doğrulayalım)
+            BakiyeHesapla(conn);
             tx.Commit();
         }
         catch
@@ -411,6 +420,25 @@ public class Database
             tx.Rollback();
             throw;
         }
+    }
+
+    /// <summary>
+    /// JsonElement'ten sayısal değeri güvenli şekilde okur.
+    /// String olarak gelirse InvariantCulture ile parse eder.
+    /// </summary>
+    private static double JsonSayi(System.Text.Json.JsonElement el, string prop)
+    {
+        if (!el.TryGetProperty(prop, out var val)) return 0;
+        return val.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Number => val.GetDouble(),
+            System.Text.Json.JsonValueKind.String =>
+                double.TryParse(val.GetString(),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var d) ? d : 0,
+            _ => 0
+        };
     }
 
     // ── YARDIMCI ────────────────────────────────────────────────────────
